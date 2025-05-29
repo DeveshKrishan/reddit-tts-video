@@ -5,7 +5,7 @@ from gtts import gTTS
 
 import reddit.fetch_content as fetch_content
 
-OUTPUT_FOLDER = "audio"
+OUTPUT_FOLDER = "assets/audio"
 
 
 def main() -> None:
