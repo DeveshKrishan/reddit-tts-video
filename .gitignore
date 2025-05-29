@@ -8,6 +8,7 @@ __pycache__/
 
 # audio files
 audio/
+video/
 
 # Distribution / packaging
 .Python
