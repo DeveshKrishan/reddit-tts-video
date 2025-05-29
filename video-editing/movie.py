@@ -1,18 +1,27 @@
-from moviepy import VideoFileClip, vfx
+import os
+
+from moviepy import CompositeVideoClip, VideoFileClip
 
 OUTPUT_FOLDER = "assets/video"
-clip = VideoFileClip("video/input2.mp4")
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+clip = VideoFileClip("video/input3.mp4")
 
+# Set crop size for YouTube Shorts (9:16, 1080x1920)
 target_width = 1080
 target_height = 1920
 
-# Center crop to phone aspect ratio (9:16)
+center_x, center_y = clip.w // 2, clip.h // 2
 
-# Resize the cropped video to width 460, maintaining aspect ratio
-clip_resized = clip.with_effects(
-    [
-        vfx.Resize(width=target_width, height=target_height),
-    ]
-)
+crop_x = center_x - target_width / 2
+crop_y = center_y - target_height / 2
 
-clip_resized.write_videofile("output_cropped.mp4", codec="libx264", fps=30)
+clip = clip.without_audio()
+clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
+
+
+# audio = AudioClip("audio/1ehlrdd.mp3")
+
+# clip = clip.with_audio(audio)
+final_video = CompositeVideoClip([clip])
+
+final_video.write_videofile(f"{OUTPUT_FOLDER}/output_cropped.mov", fps=30)

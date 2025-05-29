@@ -10,6 +10,7 @@ __pycache__/
 audio/
 video/
 
+.DS_Store
 # Distribution / packaging
 .Python
 build/
