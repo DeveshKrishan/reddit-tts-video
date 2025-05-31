@@ -9,12 +9,15 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 OUTPUT_FOLDER = "assets/video"
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-clip = VideoFileClip("video/input3.mp4")
+
+clip = VideoFileClip("video/input2.mp4")
+
+audio = AudioFileClip("audio/1ehlrdd.mp3")
+duration = min(clip.duration, audio.duration)
+clip = clip.subclipped(0, duration)
 
 target_width = 1080
 target_height = 1920
-subtitle = TextClip(text="Test", font_size=48).with_duration(5)
-# subtitle = subtitle.set_position(("center", clip.h - 150)).set_duration(5)  # Show for 5 seconds at the bottom
 
 center_x, center_y = clip.w // 2, clip.h // 2
 
@@ -27,20 +30,16 @@ subtitles = [((segment["start"], segment["end"]), segment["text"]) for segment i
 
 
 def make_textclip(txt: str) -> TextClip:
-    """Generates a TextClip for subtitles with the given text."""
-    return TextClip(text=txt, font_size=24, color="white")
+    """Generates a TextClip for subtitles with the given text, centered on the video."""
+    return TextClip(text=txt, font_size=38, color="white", text_align="center", stroke_color="black", stroke_width=3)
 
 
 subtitles_clip = SubtitlesClip(subtitles=subtitles, make_textclip=make_textclip)
 
-# clip = clip.without_audio()
 clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
 
-audio = AudioFileClip("audio/1ehlrdd.mp3")
 clip = clip.with_audio(audio)
-# clip.with_effects([afx.AudioFadeIn("00:00:06")])
 
-# clip = clip.with_audio(audio)
-final_video = CompositeVideoClip([clip, subtitles_clip])
+final_video = CompositeVideoClip([clip, subtitles_clip.with_position(("center", "center"))])
 
 final_video.write_videofile(f"{OUTPUT_FOLDER}/output_cropped.mov", fps=30)
