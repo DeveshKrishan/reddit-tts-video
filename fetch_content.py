@@ -23,13 +23,13 @@ def create_password_flow_with_praw() -> praw.Reddit:
 
 def fetch_submissions(reddit: praw.Reddit) -> list[praw.models.Submission]:
     """
-    Fetch the top submission from the AITAH subreddit.
+    Fetch the top daily submission from the AITAH subreddit.
     """
     list_of_submissions = []
-    for submission in reddit.subreddit("AITAH").top(limit=1):
+    for submission in reddit.subreddit("AITAH").top(time_filter="day", limit=1):
         list_of_submissions.append(submission)
 
-    if not list_of_submissions:
+    if list_of_submissions:
         logging.info("Reddit client created successfully with PRAW.")
 
     return list_of_submissions

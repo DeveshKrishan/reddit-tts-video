@@ -9,6 +9,7 @@ __pycache__/
 # audio files
 audio/
 video/
+output/
 
 .DS_Store
 # Distribution / packaging

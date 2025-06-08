@@ -3,14 +3,17 @@ import os
 
 from gtts import gTTS
 
-import reddit.fetch_content as fetch_content
+import fetch_content as fetch_content
+from videoeditor import create_video
 
 OUTPUT_FOLDER = "assets/audio"
 
+logging.basicConfig(level=logging.INFO)
+
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
     submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
+    submissions = submissions[:1]  # Limit to the first submission for simplicity
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     for submission in submissions:
@@ -25,6 +28,8 @@ def main() -> None:
         tts.save(f"{OUTPUT_FOLDER}/{submission_id}.mp3")
 
         logging.info(f"Saved audio for submission: {title} by {author}")
+
+    create_video()
 
 
 if __name__ == "__main__":
