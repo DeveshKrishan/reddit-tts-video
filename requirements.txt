@@ -23,6 +23,7 @@ numba==0.61.2
 numpy==2.2.6
 openai-whisper==20240930
 pillow==11.2.1
+pip-system-certs==4.0
 platformdirs==4.3.8
 praw==7.8.1
 prawcore==2.4.0
@@ -42,3 +43,4 @@ update-checker==0.18.0
 urllib3==2.4.0
 virtualenv==20.31.2
 websocket-client==1.8.0
+wrapt==1.17.2
