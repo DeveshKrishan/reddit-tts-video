@@ -23,7 +23,7 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
 
     # Load font (fallback to default if not found)
     try:
-        font_title = ImageFont.truetype("assets/fonts/Poppins/Poppins-Medium.ttf", 60)
+        font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 60)
     except OSError:
         font_title = ImageFont.load_default()
 
