@@ -31,12 +31,21 @@ subtitles = [((segment["start"], segment["end"]), segment["text"]) for segment i
 
 def make_textclip(txt: str) -> TextClip:
     """Generates a TextClip for subtitles with the given text, centered on the video."""
-    return TextClip(text=txt, font_size=38, color="white", text_align="center", stroke_color="black", stroke_width=3)
+    return TextClip(
+        text=txt,
+        font_size=48,
+        color="white",
+        text_align="center",
+        stroke_color="black",
+        stroke_width=5,
+        size=(clip.w, clip.h),
+        method="caption",
+    )
 
 
 subtitles_clip = SubtitlesClip(subtitles=subtitles, make_textclip=make_textclip)
 
-clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
+# clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
 
 clip = clip.with_audio(audio)
 
