@@ -4,7 +4,9 @@ import os
 from gtts import gTTS
 
 import fetch_content as fetch_content
-from videoeditor import create_video
+from thumbnail import create_thumbnail
+
+# from videoeditor import create_video
 
 OUTPUT_FOLDER = "assets/audio"
 
@@ -29,7 +31,9 @@ def main() -> None:
 
         logging.info(f"Saved audio for submission: {title} by {author}")
 
-    create_video()
+        create_thumbnail(submission)
+
+    # create_video()
 
 
 if __name__ == "__main__":
