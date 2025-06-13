@@ -81,8 +81,8 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     title_top = profile_y + profile_radius + 30
     title_bottom = icon_y - 30  # leave some gap above the icons
     available_height = title_bottom - title_top
-    # Set horizontal padding
-    padding_x = 60
+    # Set horizontal padding (reduced for more width)
+    padding_x = 30  # Reduce padding to allow more text width
     max_text_width = width - 2 * padding_x
     # Dynamically adjust font size and wrapping to fit the space and width
     max_font_size = 80
@@ -93,8 +93,8 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
             font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", font_size)
         except OSError:
             font_title = ImageFont.load_default()
-        # Try different wrap widths to fit the height and width
-        for wrap_width in range(22, 8, -1):
+        # Try much larger wrap widths to fit more words per line
+        for wrap_width in range(40, 8, -1):
             wrapped = textwrap.fill(title, width=wrap_width)
             bbox = draw.multiline_textbbox((0, 0), wrapped, font=font_title)
             text_w = bbox[2] - bbox[0]
