@@ -73,15 +73,39 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
     draw.text((emoji_x, emoji_y), emojis, font=font_emoji, fill="black")
 
+    # Draw like/comment icons and counts (simple placeholders)
+    icon_y = height - 80
+
     # Draw the wrapped title (large, bold, left-aligned)
-    wrapped_title = textwrap.fill(title, width=22)
-    try:
-        font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 54)
-    except OSError:
-        font_title = ImageFont.load_default()
-    _, _, w, h = draw.textbbox((0, 0), wrapped_title, font=font_title)
-    text_x = 40
-    text_y = profile_y + profile_radius + 30
+    # Calculate available space for the title
+    title_top = profile_y + profile_radius + 30
+    title_bottom = icon_y - 30  # leave some gap above the icons
+    available_height = title_bottom - title_top
+    # Set horizontal padding
+    padding_x = 60
+    max_text_width = width - 2 * padding_x
+    # Dynamically adjust font size and wrapping to fit the space and width
+    max_font_size = 80
+    min_font_size = 28
+    wrapped_title = title
+    for font_size in range(max_font_size, min_font_size - 1, -2):
+        try:
+            font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", font_size)
+        except OSError:
+            font_title = ImageFont.load_default()
+        # Try different wrap widths to fit the height and width
+        for wrap_width in range(22, 8, -1):
+            wrapped = textwrap.fill(title, width=wrap_width)
+            bbox = draw.multiline_textbbox((0, 0), wrapped, font=font_title)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            if text_h <= available_height and text_w <= max_text_width:
+                wrapped_title = wrapped
+                break
+        if text_h <= available_height and text_w <= max_text_width:
+            break
+    text_x = padding_x
+    text_y = title_top + (available_height - text_h) // 2  # center vertically in available space
     draw.multiline_text((text_x, text_y), wrapped_title, font=font_title, fill="black", align="left")
 
     # Draw like/comment icons and counts (simple placeholders)
