@@ -29,7 +29,7 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
 
     # Draw the username as 'The Daily Redditor' (no submission author)
     profile_radius = 60
-    # profile_x = 40 + profile_radius
+    _ = 40 + profile_radius
     profile_y = 40 + profile_radius  # Move profile up
     # Draw a brown circle as a placeholder for the profile pic
     draw.ellipse(
@@ -48,7 +48,7 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_emoji = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
     except OSError:
         font_emoji = ImageFont.load_default()
-    _, emoji_h = draw.textbbox((0, 0), emojisfont=font_emoji)[2:]
+    emoji_w, emoji_h = draw.textbbox((0, 0), emojis, font=font_emoji)[2:]
 
     # Calculate the total height of username + gap + emojis
     gap = 10
@@ -62,10 +62,15 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     emoji_y = user_y + user_h + gap
 
     draw.text((user_x, user_y), username, font=font_user, fill="black")
-    # Draw a blue checkmark (simple circle for now)
+    # Draw the verified emoji PNG instead of a blue circle
+    from PIL import Image as PILImage
+
+    verified_img = PILImage.open("assets/emojis/verified.png").convert("RGBA")
+    verified_size = 32
+    verified_img = verified_img.resize((verified_size, verified_size), PILImage.LANCZOS)
     check_x = user_x + user_w + 10
-    check_y = user_y + user_h // 4
-    draw.ellipse((check_x, check_y, check_x + 20, check_y + 20), fill=(66, 133, 244))
+    check_y = user_y + user_h // 2 - verified_size // 2
+    img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
     draw.text((emoji_x, emoji_y), emojis, font=font_emoji, fill="black")
 
     # Draw the wrapped title (large, bold, left-aligned)
@@ -85,8 +90,12 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_icon = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 40)
     except OSError:
         font_icon = ImageFont.load_default()
-    draw.text((40, icon_y), "♡", font=font_icon, fill="gray")
-    draw.text((120, icon_y), "99+", font=font_icon, fill="gray")
+    # Use heart.png for the heart icon
+    heart_img = PILImage.open("assets/emojis/heart.png").convert("RGBA")
+    heart_size = 40
+    heart_img = heart_img.resize((heart_size, heart_size), PILImage.LANCZOS)
+    img.paste(heart_img, (40, icon_y), heart_img)
+    draw.text((100, icon_y), "99+", font=font_icon, fill="gray")
     draw.text((220, icon_y), "💬", font=font_icon, fill="gray")
     draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
 
