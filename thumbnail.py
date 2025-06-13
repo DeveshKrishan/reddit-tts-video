@@ -128,8 +128,5 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     img.paste(conversation_img, (220, icon_y), conversation_img)
     draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
 
-    # Draw share icon (simple placeholder)
-    draw.text((width - 120, icon_y), "⇪ Share", font=font_icon, fill="gray")
-
     img.save(f"assets/video/{submission.id}_thumbnail.jpg")
     logging.info(f"Thumbnail saved to assets/video/{submission.id}_thumbnail.jpg")
