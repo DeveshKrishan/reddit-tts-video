@@ -120,7 +120,12 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     heart_img = heart_img.resize((heart_size, heart_size), PILImage.LANCZOS)
     img.paste(heart_img, (40, icon_y), heart_img)
     draw.text((100, icon_y), "99+", font=font_icon, fill="gray")
-    draw.text((220, icon_y), "💬", font=font_icon, fill="gray")
+
+    # Use conversation.png for the comment icon
+    conversation_img = PILImage.open("assets/emojis/conversation.png").convert("RGBA")
+    conversation_size = 40
+    conversation_img = conversation_img.resize((conversation_size, conversation_size), PILImage.LANCZOS)
+    img.paste(conversation_img, (220, icon_y), conversation_img)
     draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
 
     # Draw share icon (simple placeholder)
