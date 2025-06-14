@@ -124,19 +124,34 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_icon = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 40)
     except OSError:
         font_icon = ImageFont.load_default()
-    # Use heart.png for the heart icon
+    # --- Like/Comment block layout ---
+    # Left align the like/comment blocks with the rest of the content
+    left_x = 30  # match the left padding used elsewhere
     heart_img = Image.open("assets/emojis/heart.png").convert("RGBA")
     heart_size = 40
     heart_img = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
-    img.paste(heart_img, (40, icon_y), heart_img)
-    draw.text((100, icon_y), "99+", font=font_icon, fill="gray")
-
-    # Use conversation.png for the comment icon
+    heart_text = "99+"
+    _, _, heart_text_w, heart_text_h = draw.textbbox((0, 0), heart_text, font=font_icon)
+    # Place heart and 99+ left-aligned, with 99+ to the right of the image
+    heart_img_x = left_x
+    heart_img_y = icon_y
+    heart_text_x = heart_img_x + heart_size + 20  # increased gap from 10 to 20
+    heart_text_y = heart_img_y + (heart_size - heart_text_h) // 2 - 5
+    img.paste(heart_img, (heart_img_x, heart_img_y), heart_img)
+    draw.text((heart_text_x, heart_text_y), heart_text, font=font_icon, fill="gray")
+    # Conversation + 99+ (left-aligned, with gap)
+    icon_gap = 50
     conversation_img = Image.open("assets/emojis/conversation.png").convert("RGBA")
     conversation_size = 40
     conversation_img = conversation_img.resize((conversation_size, conversation_size), Image.LANCZOS)
-    img.paste(conversation_img, (220, icon_y), conversation_img)
-    draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
+    comment_text = "99+"
+    _, _, comment_text_w, comment_text_h = draw.textbbox((0, 0), comment_text, font=font_icon)
+    conversation_img_x = left_x + heart_size + heart_text_w + icon_gap
+    conversation_img_y = icon_y
+    comment_text_x = conversation_img_x + conversation_size + 20  # increased gap from 10 to 20
+    comment_text_y = conversation_img_y + (conversation_size - comment_text_h) // 2 - 5
+    img.paste(conversation_img, (conversation_img_x, conversation_img_y), conversation_img)
+    draw.text((comment_text_x, comment_text_y), comment_text, font=font_icon, fill="gray")
 
     img.save(f"assets/video/{submission.id}_thumbnail.jpg")
     logging.info(f"Thumbnail saved to assets/video/{submission.id}_thumbnail.jpg")
