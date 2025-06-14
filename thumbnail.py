@@ -31,13 +31,12 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     profile_radius = 60
     _ = 40 + profile_radius
     profile_y = 40 + profile_radius  # Move profile up
-    from PIL import Image as PILImage
 
     # Draw a profile picture using the provided pfp image
-    pfp_img = PILImage.open("assets/sololevelingpfp.jpg").convert("RGBA")
-    pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), PILImage.LANCZOS)
+    pfp_img = Image.open("assets/sololevelingpfp.jpg").convert("RGBA")
+    pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), Image.LANCZOS)
     # Create a mask for a circular crop
-    mask = PILImage.new("L", (2 * profile_radius, 2 * profile_radius), 0)
+    mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
     mask_draw = ImageDraw.Draw(mask)
     mask_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
     img.paste(pfp_img, (40, profile_y - profile_radius), mask)
@@ -58,11 +57,10 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     # Draw username
     draw.text((user_x, user_y), username, font=font_user, fill="black")
     # Draw the verified emoji PNG instead of a blue circle
-    from PIL import Image as PILImage
 
-    verified_img = PILImage.open("assets/emojis/verified.png").convert("RGBA")
+    verified_img = Image.open("assets/emojis/verified.png").convert("RGBA")
     verified_size = 32
-    verified_img = verified_img.resize((verified_size, verified_size), PILImage.LANCZOS)
+    verified_img = verified_img.resize((verified_size, verified_size), Image.LANCZOS)
     check_x = user_x + user_w + 10
     check_y = user_y + user_h // 2 - verified_size // 2
     img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
@@ -81,7 +79,7 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     emoji_gap = 10
     emoji_x = left_x
     for emoji_path in emoji_files:
-        emoji_img = PILImage.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), PILImage.LANCZOS)
+        emoji_img = Image.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), Image.LANCZOS)
         img.paste(emoji_img, (int(emoji_x), int(emoji_y)), emoji_img)
         emoji_x += emoji_size + emoji_gap
 
@@ -127,16 +125,16 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     except OSError:
         font_icon = ImageFont.load_default()
     # Use heart.png for the heart icon
-    heart_img = PILImage.open("assets/emojis/heart.png").convert("RGBA")
+    heart_img = Image.open("assets/emojis/heart.png").convert("RGBA")
     heart_size = 40
-    heart_img = heart_img.resize((heart_size, heart_size), PILImage.LANCZOS)
+    heart_img = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
     img.paste(heart_img, (40, icon_y), heart_img)
     draw.text((100, icon_y), "99+", font=font_icon, fill="gray")
 
     # Use conversation.png for the comment icon
-    conversation_img = PILImage.open("assets/emojis/conversation.png").convert("RGBA")
+    conversation_img = Image.open("assets/emojis/conversation.png").convert("RGBA")
     conversation_size = 40
-    conversation_img = conversation_img.resize((conversation_size, conversation_size), PILImage.LANCZOS)
+    conversation_img = conversation_img.resize((conversation_size, conversation_size), Image.LANCZOS)
     img.paste(conversation_img, (220, icon_y), conversation_img)
     draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
 
