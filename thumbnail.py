@@ -31,10 +31,16 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     profile_radius = 60
     _ = 40 + profile_radius
     profile_y = 40 + profile_radius  # Move profile up
-    # Draw a brown circle as a placeholder for the profile pic
-    draw.ellipse(
-        (40, profile_y - profile_radius, 40 + 2 * profile_radius, profile_y + profile_radius), fill=(120, 90, 60)
-    )
+    from PIL import Image as PILImage
+
+    # Draw a profile picture using the provided pfp image
+    pfp_img = PILImage.open("assets/sololevelingpfp.jpg").convert("RGBA")
+    pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), PILImage.LANCZOS)
+    # Create a mask for a circular crop
+    mask = PILImage.new("L", (2 * profile_radius, 2 * profile_radius), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
+    img.paste(pfp_img, (40, profile_y - profile_radius), mask)
     username = "The Daily Redditor"
     try:
         font_user = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
