@@ -31,11 +31,15 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     profile_radius = 60
     _ = 40 + profile_radius
     profile_y = 40 + profile_radius  # Move profile up
-    # Draw a brown circle as a placeholder for the profile pic
-    draw.ellipse(
-        (40, profile_y - profile_radius, 40 + 2 * profile_radius, profile_y + profile_radius), fill=(120, 90, 60)
-    )
-    # Vertically center the username and emojis as a block to the icon on the left, but left-align them
+
+    # Draw a profile picture using the provided pfp image
+    pfp_img = Image.open("assets/sololevelingpfp.jpg").convert("RGBA")
+    pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), Image.LANCZOS)
+    # Create a mask for a circular crop
+    mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
+    img.paste(pfp_img, (40, profile_y - profile_radius), mask)
     username = "The Daily Redditor"
     try:
         font_user = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
@@ -43,35 +47,41 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_user = ImageFont.load_default()
     user_w, user_h = draw.textbbox((0, 0), username, font=font_user)[2:]
 
-    emojis = "🎩🤍🧑‍⚖️🏆🧿😃❤️‍🔥💀👎"
-    try:
-        font_emoji = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
-    except OSError:
-        font_emoji = ImageFont.load_default()
-    emoji_w, emoji_h = draw.textbbox((0, 0), emojis, font=font_emoji)[2:]
-
-    # Calculate the total height of username + gap + emojis
     gap = 10
-    total_text_height = user_h + gap + emoji_h
-    # Vertically center this block to the icon, but left-align to the icon's right edge
     left_x = 40 + 2 * profile_radius + 20
-    block_y = profile_y - total_text_height // 2
+    block_y = profile_y - (user_h + gap + 44) // 2  # 44 is emoji_size
     user_x = left_x
     user_y = block_y
     emoji_x = left_x
     emoji_y = user_y + user_h + gap
-
+    # Draw username
     draw.text((user_x, user_y), username, font=font_user, fill="black")
     # Draw the verified emoji PNG instead of a blue circle
-    from PIL import Image as PILImage
 
-    verified_img = PILImage.open("assets/emojis/verified.png").convert("RGBA")
+    verified_img = Image.open("assets/emojis/verified.png").convert("RGBA")
     verified_size = 32
-    verified_img = verified_img.resize((verified_size, verified_size), PILImage.LANCZOS)
+    verified_img = verified_img.resize((verified_size, verified_size), Image.LANCZOS)
     check_x = user_x + user_w + 10
     check_y = user_y + user_h // 2 - verified_size // 2
     img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
-    draw.text((emoji_x, emoji_y), emojis, font=font_emoji, fill="black")
+    # Draw emoji row using PNGs in the pattern: diamond, fire, skull, shocked (repeat 2x)
+    emoji_files = [
+        "assets/emojis/diamond.png",
+        "assets/emojis/fire.png",
+        "assets/emojis/skull.png",
+        "assets/emojis/shocked.png",
+        "assets/emojis/diamond.png",
+        "assets/emojis/fire.png",
+        "assets/emojis/skull.png",
+        "assets/emojis/shocked.png",
+    ]
+    emoji_size = 44
+    emoji_gap = 10
+    emoji_x = left_x
+    for emoji_path in emoji_files:
+        emoji_img = Image.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), Image.LANCZOS)
+        img.paste(emoji_img, (int(emoji_x), int(emoji_y)), emoji_img)
+        emoji_x += emoji_size + emoji_gap
 
     # Draw like/comment icons and counts (simple placeholders)
     icon_y = height - 80
@@ -114,19 +124,34 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_icon = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 40)
     except OSError:
         font_icon = ImageFont.load_default()
-    # Use heart.png for the heart icon
-    heart_img = PILImage.open("assets/emojis/heart.png").convert("RGBA")
+    # --- Like/Comment block layout ---
+    # Left align the like/comment blocks with the rest of the content
+    left_x = 30  # match the left padding used elsewhere
+    heart_img = Image.open("assets/emojis/heart.png").convert("RGBA")
     heart_size = 40
-    heart_img = heart_img.resize((heart_size, heart_size), PILImage.LANCZOS)
-    img.paste(heart_img, (40, icon_y), heart_img)
-    draw.text((100, icon_y), "99+", font=font_icon, fill="gray")
-
-    # Use conversation.png for the comment icon
-    conversation_img = PILImage.open("assets/emojis/conversation.png").convert("RGBA")
+    heart_img = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
+    heart_text = "99+"
+    _, _, heart_text_w, heart_text_h = draw.textbbox((0, 0), heart_text, font=font_icon)
+    # Place heart and 99+ left-aligned, with 99+ to the right of the image
+    heart_img_x = left_x
+    heart_img_y = icon_y
+    heart_text_x = heart_img_x + heart_size + 20  # increased gap from 10 to 20
+    heart_text_y = heart_img_y + (heart_size - heart_text_h) // 2 - 5
+    img.paste(heart_img, (heart_img_x, heart_img_y), heart_img)
+    draw.text((heart_text_x, heart_text_y), heart_text, font=font_icon, fill="gray")
+    # Conversation + 99+ (left-aligned, with gap)
+    icon_gap = 50
+    conversation_img = Image.open("assets/emojis/conversation.png").convert("RGBA")
     conversation_size = 40
-    conversation_img = conversation_img.resize((conversation_size, conversation_size), PILImage.LANCZOS)
-    img.paste(conversation_img, (220, icon_y), conversation_img)
-    draw.text((300, icon_y), "99+", font=font_icon, fill="gray")
+    conversation_img = conversation_img.resize((conversation_size, conversation_size), Image.LANCZOS)
+    comment_text = "99+"
+    _, _, comment_text_w, comment_text_h = draw.textbbox((0, 0), comment_text, font=font_icon)
+    conversation_img_x = left_x + heart_size + heart_text_w + icon_gap
+    conversation_img_y = icon_y
+    comment_text_x = conversation_img_x + conversation_size + 20  # increased gap from 10 to 20
+    comment_text_y = conversation_img_y + (conversation_size - comment_text_h) // 2 - 5
+    img.paste(conversation_img, (conversation_img_x, conversation_img_y), conversation_img)
+    draw.text((comment_text_x, comment_text_y), comment_text, font=font_icon, fill="gray")
 
     img.save(f"assets/video/{submission.id}_thumbnail.jpg")
     logging.info(f"Thumbnail saved to assets/video/{submission.id}_thumbnail.jpg")
