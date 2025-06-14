@@ -35,7 +35,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     draw.ellipse(
         (40, profile_y - profile_radius, 40 + 2 * profile_radius, profile_y + profile_radius), fill=(120, 90, 60)
     )
-    # Vertically center the username and emojis as a block to the icon on the left, but left-align them
     username = "The Daily Redditor"
     try:
         font_user = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
@@ -43,24 +42,14 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         font_user = ImageFont.load_default()
     user_w, user_h = draw.textbbox((0, 0), username, font=font_user)[2:]
 
-    emojis = "🎩🤍🧑‍⚖️🏆🧿😃❤️‍🔥💀👎"
-    try:
-        font_emoji = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
-    except OSError:
-        font_emoji = ImageFont.load_default()
-    emoji_w, emoji_h = draw.textbbox((0, 0), emojis, font=font_emoji)[2:]
-
-    # Calculate the total height of username + gap + emojis
     gap = 10
-    total_text_height = user_h + gap + emoji_h
-    # Vertically center this block to the icon, but left-align to the icon's right edge
     left_x = 40 + 2 * profile_radius + 20
-    block_y = profile_y - total_text_height // 2
+    block_y = profile_y - (user_h + gap + 44) // 2  # 44 is emoji_size
     user_x = left_x
     user_y = block_y
     emoji_x = left_x
     emoji_y = user_y + user_h + gap
-
+    # Draw username
     draw.text((user_x, user_y), username, font=font_user, fill="black")
     # Draw the verified emoji PNG instead of a blue circle
     from PIL import Image as PILImage
@@ -71,7 +60,24 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     check_x = user_x + user_w + 10
     check_y = user_y + user_h // 2 - verified_size // 2
     img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
-    draw.text((emoji_x, emoji_y), emojis, font=font_emoji, fill="black")
+    # Draw emoji row using PNGs in the pattern: diamond, fire, skull, shocked (repeat 2x)
+    emoji_files = [
+        "assets/emojis/diamond.png",
+        "assets/emojis/fire.png",
+        "assets/emojis/skull.png",
+        "assets/emojis/shocked.png",
+        "assets/emojis/diamond.png",
+        "assets/emojis/fire.png",
+        "assets/emojis/skull.png",
+        "assets/emojis/shocked.png",
+    ]
+    emoji_size = 44
+    emoji_gap = 10
+    emoji_x = left_x
+    for emoji_path in emoji_files:
+        emoji_img = PILImage.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), PILImage.LANCZOS)
+        img.paste(emoji_img, (int(emoji_x), int(emoji_y)), emoji_img)
+        emoji_x += emoji_size + emoji_gap
 
     # Draw like/comment icons and counts (simple placeholders)
     icon_y = height - 80
