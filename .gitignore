@@ -178,3 +178,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+client_secret_375763626382-lisqtjg17540c9pprqt3pfudljgodj6c.apps.googleusercontent.com.json
+
+# Ignore any file containing 'secret' in its name
+*secret*
