@@ -6,32 +6,28 @@
 
 import os
 
-import google_auth_oauthlib.flow
-import googleapiclient.discovery
-import googleapiclient.errors
+from dotenv import load_dotenv
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
-scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
+load_dotenv()  # Loads variables from .env
 
+creds = Credentials(
+    None,
+    refresh_token=os.getenv("YT_REFRESH_TOKEN"),
+    token_uri="https://oauth2.googleapis.com/token",
+    client_id=os.getenv("YT_CLIENT_ID"),
+    client_secret=os.getenv("YT_CLIENT_SECRET"),
+    scopes=["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"],
+)
 
-def main() -> None:
-    # Disable OAuthlib's HTTPS verification when running locally.
-    # *DO NOT* leave this option enabled in production.
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+youtube = build("youtube", "v3", credentials=creds)
 
-    api_service_name = "youtube"
-    api_version = "v3"
-    client_secrets_file = ""
+# Sample API call: Get your channel info
+response = youtube.channels().list(part="snippet,contentDetails,statistics", mine=True).execute()
 
-    # Get credentials and create an API client
-    flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(client_secrets_file, scopes)
-    credentials = flow.run_local_server(port=0)
-    youtube = googleapiclient.discovery.build(api_service_name, api_version, credentials=credentials)
-
-    request = youtube.channels().list(part="snippet,contentDetails,statistics", mine=True)
-    response = request.execute()
-
-    print(response)
+print("Channel info:")
+print(response)
 
 
-if __name__ == "__main__":
-    main()
+# ...existing code for uploading or interacting with YouTube...
