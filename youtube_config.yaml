@@ -1,0 +1,6 @@
+category_id: "22"
+privacy_status: "private"
+description: "Uploaded via API"
+scopes:
+  - "https://www.googleapis.com/auth/youtube.upload"
+  - "https://www.googleapis.com/auth/youtube.readonly"

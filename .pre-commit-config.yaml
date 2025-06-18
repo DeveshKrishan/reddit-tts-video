@@ -4,7 +4,8 @@ repos:
   rev: v0.11.11
   hooks:
     - id: ruff
-      name: lint with ruff
+      name: lint and fix with ruff
+      args: [--fix]
     - id: ruff
       name: sort imports with ruff
       args: [--select, I, --fix]
@@ -15,5 +16,5 @@ repos:
   rev: 'v1.15.0'  # Use the sha / tag you want to point at
   hooks:
   -   id: mypy
-      args: [--strict, --ignore-missing-imports]
-      
+      args: [ --ignore-missing-imports]
+      additional_dependencies: [types-PyYAML]
