@@ -153,5 +153,5 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     img.paste(conversation_img, (conversation_img_x, conversation_img_y), conversation_img)
     draw.text((comment_text_x, comment_text_y), comment_text, font=font_icon, fill="gray")
 
-    img.save(f"assets/video/{submission.id}_thumbnail.jpg")
-    logging.info(f"Thumbnail saved to assets/video/{submission.id}_thumbnail.jpg")
+    img.save(f"assets/thumbnails/{submission.id}.jpg")
+    logging.info(f"Thumbnail saved to assets/thumbnails/{submission.id}.jpg")
