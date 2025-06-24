@@ -10,6 +10,8 @@ __pycache__/
 audio/
 video/
 output/
+thumbnails/
+*.json
 
 .DS_Store
 # Distribution / packaging

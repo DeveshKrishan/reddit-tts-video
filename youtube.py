@@ -33,7 +33,6 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
         config = yaml.safe_load(f)
     category_id = config.get("category_id")
     privacy_status = config.get("privacy_status")
-    description = config.get("description")
     scopes = config.get(
         "scopes", ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
     )
@@ -42,13 +41,16 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
 
     youtube = build("youtube", "v3", credentials=creds)
 
+    # Build a safe, short description using only title, author, and subreddit (no link)
+    description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}"
+
     body = {
         "snippet": {
             "title": submission.title,
             "description": description,
             "categoryId": category_id,
         },
-        "status": {"privacyStatus": privacy_status},
+        "status": {"privacyStatus": privacy_status, "selfDeclaredMadeForKids": False},
     }
 
     media = MediaFileUpload(video_file, chunksize=-1, resumable=True)
@@ -63,3 +65,11 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
             print(f"Uploaded {int(status.progress() * 100)}%...")
     print("Upload complete!")
     print("Video ID:", response["id"])
+
+    # Set the thumbnail after upload
+    thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
+    if os.path.exists(thumbnail_path):
+        youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()
+        print(f"Thumbnail uploaded from {thumbnail_path}")
+    else:
+        print(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")
