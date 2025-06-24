@@ -6,7 +6,7 @@ from moviepy import AudioFileClip, CompositeVideoClip, TextClip, VideoFileClip
 from moviepy.video.tools.subtitles import SubtitlesClip
 
 
-def create_video() -> None:
+def create_video(submission) -> None:
     ssl._create_default_https_context = ssl._create_unverified_context
 
     OUTPUT_FOLDER = "output"
@@ -14,7 +14,7 @@ def create_video() -> None:
 
     clip = VideoFileClip("assets/video/input2.mp4")
 
-    audio = AudioFileClip("assets/audio/1ehlrdd.mp3")
+    audio = AudioFileClip(f"assets/audio/{submission.id}.mp3")
     duration = min(clip.duration, audio.duration)
     clip = clip.subclipped(0, duration)
 
