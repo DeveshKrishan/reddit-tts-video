@@ -32,7 +32,7 @@ def main() -> None:
         logging.info(f"Saved audio for submission: {title} by {author}")
 
         create_thumbnail(submission)
-        create_video()
+        create_video(submission)
 
         upload_video(submission=submission, video_file="assets/output/output_cropped.mov")
 
