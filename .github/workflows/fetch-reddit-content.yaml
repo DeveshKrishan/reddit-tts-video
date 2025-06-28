@@ -23,6 +23,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Download background footage from Google Drive
+        run: |
+          pip install gdown
+          gdown "${{ secrets.GDRIVE_FOOTAGE_URL }}" -O assets/video/input2.mp4
+
       - name: Run python script
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
@@ -30,4 +35,4 @@ jobs:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
-          python fetch_content.py
+          python main.py
