@@ -26,7 +26,7 @@ def create_video(submission) -> None:
     # crop_x = center_x - target_width / 2
     # crop_y = center_y - target_height / 2
     model = whisper.load_model("base")
-    result = model.transcribe("assets/audio/1ehlrdd.mp3")
+    result = model.transcribe(f"assets/audio/{submission.id}.mp3")
 
     subtitles = [((segment["start"], segment["end"]), segment["text"]) for segment in result["segments"]]
 
@@ -51,4 +51,4 @@ def create_video(submission) -> None:
 
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(("center", "center"))])
 
-    final_video.write_videofile(f"{OUTPUT_FOLDER}/output_cropped.mov", fps=30)
+    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30)

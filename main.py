@@ -29,12 +29,12 @@ def main() -> None:
         # save locally
         tts.save(f"{OUTPUT_FOLDER}/{submission_id}.mp3")
 
-        logging.info(f"Saved audio for submission: {title} by {author}")
+        logging.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
 
         create_thumbnail(submission)
         create_video(submission)
 
-        upload_video(submission=submission, video_file="assets/output/output_cropped.mov")
+        upload_video(submission=submission, video_file=f"output/{submission_id}.mov")
 
 
 if __name__ == "__main__":
