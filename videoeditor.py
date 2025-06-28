@@ -13,18 +13,15 @@ def create_video(submission) -> None:
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     clip = VideoFileClip("assets/video/input2.mp4")
-
     audio = AudioFileClip(f"assets/audio/{submission.id}.mp3")
-    duration = min(clip.duration, audio.duration)
-    clip = clip.subclipped(0, duration)
+    duration = audio.duration
+    # Loop the video if it's shorter than the audio
+    if clip.duration < duration:
+        n_loops = int(duration // clip.duration) + 1
+        clip = clip.loop(n_loops=n_loops).subclip(0, duration)
+    else:
+        clip = clip.subclip(0, duration)
 
-    # target_width = 1080
-    # target_height = 1920
-
-    # center_x, center_y = clip.w // 2, clip.h // 2
-
-    # crop_x = center_x - target_width / 2
-    # crop_y = center_y - target_height / 2
     model = whisper.load_model("base")
     result = model.transcribe(f"assets/audio/{submission.id}.mp3")
 
@@ -44,8 +41,6 @@ def create_video(submission) -> None:
         )
 
     subtitles_clip = SubtitlesClip(subtitles=subtitles, make_textclip=make_textclip)
-
-    # clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
 
     clip = clip.with_audio(audio)
 
