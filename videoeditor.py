@@ -17,10 +17,9 @@ def create_video(submission) -> None:
     duration = audio.duration
     # Loop the video if it's shorter than the audio
     if clip.duration < duration:
-        n_loops = int(duration // clip.duration) + 1
-        clip = clip.loop(n_loops=n_loops).subclip(0, duration)
+        clip = clip.fx("loop", duration=duration)
     else:
-        clip = clip.subclip(0, duration)
+        clip = clip.subclipped(0, duration)
 
     model = whisper.load_model("base")
     result = model.transcribe(f"assets/audio/{submission.id}.mp3")
