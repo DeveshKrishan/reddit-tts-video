@@ -47,4 +47,4 @@ def create_video(submission) -> None:
 
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(("center", "center"))])
 
-    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30, logger=None)
+    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30)
