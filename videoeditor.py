@@ -3,6 +3,7 @@ import ssl
 
 import whisper
 from moviepy import AudioFileClip, CompositeVideoClip, TextClip, VideoFileClip
+from moviepy.video.fx.Loop import Loop
 from moviepy.video.tools.subtitles import SubtitlesClip
 
 
@@ -17,7 +18,8 @@ def create_video(submission) -> None:
     duration = audio.duration
     # Loop the video if it's shorter than the audio
     if clip.duration < duration:
-        clip = clip.fx("loop", duration=duration)
+        effect = Loop(duration=duration).copy()
+        clip = effect.apply(clip)
     else:
         clip = clip.subclipped(0, duration)
 
@@ -45,4 +47,4 @@ def create_video(submission) -> None:
 
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(("center", "center"))])
 
-    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30)
+    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30, logger=None)
