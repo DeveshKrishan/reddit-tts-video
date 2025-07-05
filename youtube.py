@@ -44,9 +44,14 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     # Build a safe, short description using only title, author, and subreddit (no link)
     description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}"
 
+    # Build a safe, short title for YouTube
+    safe_title = submission.title if submission.title else "Reddit Story"
+    safe_title = "".join(c for c in safe_title if c.isprintable())
+    safe_title = safe_title[:100]  # YouTube title max length
+
     body = {
         "snippet": {
-            "title": submission.title,
+            "title": safe_title,
             "description": description,
             "categoryId": category_id,
         },

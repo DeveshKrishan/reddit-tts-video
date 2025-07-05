@@ -3,6 +3,7 @@ import ssl
 
 import whisper
 from moviepy import AudioFileClip, CompositeVideoClip, TextClip, VideoFileClip
+from moviepy.video.fx.Loop import Loop
 from moviepy.video.tools.subtitles import SubtitlesClip
 
 
@@ -13,20 +14,17 @@ def create_video(submission) -> None:
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     clip = VideoFileClip("assets/video/input2.mp4")
-
     audio = AudioFileClip(f"assets/audio/{submission.id}.mp3")
-    duration = min(clip.duration, audio.duration)
-    clip = clip.subclipped(0, duration)
+    duration = audio.duration
+    # Loop the video if it's shorter than the audio
+    if clip.duration < duration:
+        effect = Loop(duration=duration).copy()
+        clip = effect.apply(clip)
+    else:
+        clip = clip.subclipped(0, duration)
 
-    # target_width = 1080
-    # target_height = 1920
-
-    # center_x, center_y = clip.w // 2, clip.h // 2
-
-    # crop_x = center_x - target_width / 2
-    # crop_y = center_y - target_height / 2
     model = whisper.load_model("base")
-    result = model.transcribe("assets/audio/1ehlrdd.mp3")
+    result = model.transcribe(f"assets/audio/{submission.id}.mp3")
 
     subtitles = [((segment["start"], segment["end"]), segment["text"]) for segment in result["segments"]]
 
@@ -45,10 +43,8 @@ def create_video(submission) -> None:
 
     subtitles_clip = SubtitlesClip(subtitles=subtitles, make_textclip=make_textclip)
 
-    # clip = clip.cropped(x1=crop_x, y1=crop_y, width=target_width, height=target_height)
-
     clip = clip.with_audio(audio)
 
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(("center", "center"))])
 
-    final_video.write_videofile(f"{OUTPUT_FOLDER}/output_cropped.mov", fps=30)
+    final_video.write_videofile(f"{OUTPUT_FOLDER}/{submission.id}.mov", fps=30)
