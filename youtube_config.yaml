@@ -1,5 +1,5 @@
 category_id: "22"
-privacy_status: "private"
+privacy_status: "public"
 scopes:
   - "https://www.googleapis.com/auth/youtube.upload"
   - "https://www.googleapis.com/auth/youtube.force-ssl"
