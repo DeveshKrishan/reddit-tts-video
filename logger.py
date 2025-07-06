@@ -1,20 +1,20 @@
-import json
 import logging
 import time
 
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record):
-        log_record = {
-            "time_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
-            "level": record.levelname,
-            "message": record.getMessage(),
-        }
-        return json.dumps(log_record)
+class UtcFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        ct = time.gmtime(record.created)
+        if datefmt:
+            s = time.strftime(datefmt, ct)
+        else:
+            s = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+        return s + " UTC"
 
 
 handler = logging.StreamHandler()
-handler.setFormatter(JsonFormatter())
+formatter = UtcFormatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+handler.setFormatter(formatter)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
