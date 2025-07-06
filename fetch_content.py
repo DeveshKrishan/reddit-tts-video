@@ -1,19 +1,18 @@
-import logging
 import os
 
 import praw
 from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+from logger import logger
+
+logger = logger
 
 
 def create_password_flow_with_praw() -> praw.Reddit:
     """
     Create a Reddit client using PRAW (Python Reddit API Wrapper) with password authentication.
     """
-    logging.basicConfig(level=logging.INFO)
     load_dotenv()
-
     return praw.Reddit(
         client_id=os.getenv("CLIENT_ID"),
         client_secret=os.getenv("CLIENT_SECRET"),
@@ -30,7 +29,7 @@ def fetch_submissions(reddit: praw.Reddit) -> list[praw.models.Submission]:
         list_of_submissions.append(submission)
 
     if list_of_submissions:
-        logging.info("Reddit client created successfully with PRAW.")
+        logger.info("Reddit client created successfully with PRAW.")
 
     return list_of_submissions
 
@@ -39,4 +38,4 @@ if __name__ == "__main__":
     # Example usage
     reddit = create_password_flow_with_praw()
     submissions = fetch_submissions(reddit)
-    logging.info(f"Fetched {len(submissions)} submission(s) from AITAH subreddit.")
+    logger.info(f"Fetched {len(submissions)} submission(s) from AITAH subreddit.")

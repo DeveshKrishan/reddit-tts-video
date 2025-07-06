@@ -7,6 +7,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+from logger import logger
+
 DEBUG = False
 
 
@@ -85,6 +87,6 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
     if os.path.exists(thumbnail_path):
         youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()
-        print(f"Thumbnail uploaded from {thumbnail_path}")
+        logger.info(f"Thumbnail uploaded from {thumbnail_path}")
     else:
-        print(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")
+        logger.info(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")

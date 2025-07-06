@@ -1,5 +1,7 @@
 import os
 
+from logger import logger
+
 folders = [
     "assets/audio",
     "assets/video",
@@ -11,4 +13,4 @@ folders = [
 
 for folder in folders:
     os.makedirs(folder, exist_ok=True)
-    print(f"Created folder: {folder}")
+    logger.info(f"Created folder: {folder}")

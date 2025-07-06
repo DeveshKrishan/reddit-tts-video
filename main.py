@@ -1,16 +1,14 @@
-import logging
 import os
 
 from gtts import gTTS
 
 import fetch_content as fetch_content
+from logger import logger
 from thumbnail import create_thumbnail
 from videoeditor import create_video
 from youtube import upload_video
 
 OUTPUT_FOLDER = "assets/audio"
-
-logging.basicConfig(level=logging.INFO)
 
 
 def main() -> None:
@@ -29,7 +27,7 @@ def main() -> None:
         # save locally
         tts.save(f"{OUTPUT_FOLDER}/{submission_id}.mp3")
 
-        logging.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
+        logger.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
 
         create_thumbnail(submission)
         create_video(submission)
