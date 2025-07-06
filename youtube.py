@@ -7,6 +7,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+DEBUG = False
+
 
 def get_credentials(scopes: list[str]) -> Credentials:
     """Retrieves YouTube API credientials"""
@@ -33,6 +35,14 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
         config = yaml.safe_load(f)
     category_id = config.get("category_id")
     privacy_status = config.get("privacy_status")
+
+    if not category_id or not privacy_status:
+        raise ValueError("Category ID and Privacy Status must be set in youtube_config.yaml")
+
+    if DEBUG:
+        category_id = "22"  # People & Blogs
+        privacy_status = "private"  # For testing, set to public
+
     scopes = config.get(
         "scopes", ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
     )
@@ -42,7 +52,7 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     youtube = build("youtube", "v3", credentials=creds)
 
     # Build a safe, short description using only title, author, and subreddit (no link)
-    description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}"
+    description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n\nIf you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\nShare with your friends and let us know your thoughts below."
 
     # Build a safe, short title for YouTube
     safe_title = submission.title if submission.title else "Reddit Story"
