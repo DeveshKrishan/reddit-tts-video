@@ -183,3 +183,8 @@ cython_debug/
 
 # Ignore any file containing 'secret' in its name
 *secret*
+
+# Ignore all jpg and png thumbnails except the example
+assets/thumbnails/*.jpg
+assets/thumbnails/*.png
+!assets/thumbnails/example_thumbnail_generated.png
