@@ -1,11 +1,10 @@
-import logging
 import os
 import textwrap
 
 import praw
 from PIL import Image, ImageDraw, ImageFont
 
-logging.basicConfig(level=logging.INFO)
+from logger import logger
 
 
 def create_thumbnail(submission: praw.models.Submission) -> None:
@@ -157,4 +156,4 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     # Ensure the thumbnails directory exists
     os.makedirs("assets/thumbnails", exist_ok=True)
     img.save(f"assets/thumbnails/{submission.id}.jpg")
-    logging.info(f"Thumbnail saved to assets/thumbnails/{submission.id}.jpg")
+    logger.info(f"Thumbnail saved to assets/thumbnails/{submission.id}.jpg")
