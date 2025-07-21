@@ -30,9 +30,8 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     """
     Uploads a video to YouTube using info from a PRAW submission object and a YAML config for static/auth settings.
     """
-    load_dotenv()  # Loads variables from .env
+    load_dotenv()
 
-    # Load static config and auth scopes from YAML
     with open("youtube_config.yaml", "r") as f:
         config = yaml.safe_load(f)
     category_id = config.get("category_id")
@@ -56,7 +55,6 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     # Build a safe, short description using only title, author, and subreddit (no link)
     description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n\nIf you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\nShare with your friends and let us know your thoughts below."
 
-    # Build a safe, short title for YouTube
     safe_title = submission.title if submission.title else "Reddit Story"
     safe_title = "".join(c for c in safe_title if c.isprintable())
     safe_title = safe_title[:100]  # YouTube title max length
@@ -74,16 +72,15 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
 
     request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=media)
 
-    print(f"Uploading video: {submission.title}")
+    logger.info(f"Uploading video: {submission.title}")
     response = None
     while response is None:
         status, response = request.next_chunk()
         if status:
-            print(f"Uploaded {int(status.progress() * 100)}%...")
-    print("Upload complete!")
-    print("Video ID:", response["id"])
+            logger.info(f"Uploaded {int(status.progress() * 100)}%...")
+    logger.info("Upload complete!")
+    logger.info(f"Video ID: {response['id']}")
 
-    # Set the thumbnail after upload
     thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
     if os.path.exists(thumbnail_path):
         youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()

@@ -8,6 +8,7 @@ from moviepy.video.tools.subtitles import SubtitlesClip
 
 
 def create_video(submission) -> None:
+    """Create a video for the submission with audio and subtitles"""
     ssl._create_default_https_context = ssl._create_unverified_context
 
     OUTPUT_FOLDER = "output"

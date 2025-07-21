@@ -12,11 +12,9 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     Create a YouTube thumbnail for the submission with an orange background, title, and author.
     """
 
-    # Thumbnail size (YouTube recommended: 1280x720)
     width, height = 1280, 720
     background_color = (255, 255, 255)  # White
     title = submission.title
-    # author = submission.author.name if submission.author else "Unknown"
 
     img = Image.new("RGB", (width, height), color=background_color)
     draw = ImageDraw.Draw(img)
@@ -27,7 +25,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     except OSError:
         font_title = ImageFont.load_default()
 
-    # Draw the username as 'The Daily Redditor' (no submission author)
     profile_radius = 60
     _ = 40 + profile_radius
     profile_y = 40 + profile_radius  # Move profile up
@@ -35,7 +32,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     # Draw a profile picture using the provided pfp image
     pfp_img = Image.open("assets/sololevelingpfp.jpg").convert("RGBA")
     pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), Image.LANCZOS)
-    # Create a mask for a circular crop
     mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
     mask_draw = ImageDraw.Draw(mask)
     mask_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
@@ -54,9 +50,7 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     user_y = block_y
     emoji_x = left_x
     emoji_y = user_y + user_h + gap
-    # Draw username
     draw.text((user_x, user_y), username, font=font_user, fill="black")
-    # Draw the verified emoji PNG instead of a blue circle
 
     verified_img = Image.open("assets/emojis/verified.png").convert("RGBA")
     verified_size = 32
@@ -64,7 +58,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     check_x = user_x + user_w + 10
     check_y = user_y + user_h // 2 - verified_size // 2
     img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
-    # Draw emoji row using PNGs in the pattern: diamond, fire, skull, shocked (repeat 2x)
     emoji_files = [
         "assets/emojis/diamond.png",
         "assets/emojis/fire.png",
@@ -83,16 +76,12 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         img.paste(emoji_img, (int(emoji_x), int(emoji_y)), emoji_img)
         emoji_x += emoji_size + emoji_gap
 
-    # Draw like/comment icons and counts (simple placeholders)
     icon_y = height - 80
 
-    # Draw the wrapped title (large, bold, left-aligned)
-    # Calculate available space for the title
     title_top = profile_y + profile_radius + 30
     title_bottom = icon_y - 30  # leave some gap above the icons
     available_height = title_bottom - title_top
-    # Set horizontal padding (reduced for more width)
-    padding_x = 30  # Reduce padding to allow more text width
+    padding_x = 30
     max_text_width = width - 2 * padding_x
     # Dynamically adjust font size and wrapping to fit the space and width
     max_font_size = 80
@@ -118,14 +107,11 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     text_y = title_top + (available_height - text_h) // 2  # center vertically in available space
     draw.multiline_text((text_x, text_y), wrapped_title, font=font_title, fill="black", align="left")
 
-    # Draw like/comment icons and counts (simple placeholders)
     icon_y = height - 80
     try:
         font_icon = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 40)
     except OSError:
         font_icon = ImageFont.load_default()
-    # --- Like/Comment block layout ---
-    # Left align the like/comment blocks with the rest of the content
     left_x = 30  # match the left padding used elsewhere
     heart_img = Image.open("assets/emojis/heart.png").convert("RGBA")
     heart_size = 40
@@ -139,7 +125,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     heart_text_y = heart_img_y + (heart_size - heart_text_h) // 2 - 5
     img.paste(heart_img, (heart_img_x, heart_img_y), heart_img)
     draw.text((heart_text_x, heart_text_y), heart_text, font=font_icon, fill="gray")
-    # Conversation + 99+ (left-aligned, with gap)
     icon_gap = 50
     conversation_img = Image.open("assets/emojis/conversation.png").convert("RGBA")
     conversation_size = 40
@@ -153,7 +138,6 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     img.paste(conversation_img, (conversation_img_x, conversation_img_y), conversation_img)
     draw.text((comment_text_x, comment_text_y), comment_text, font=font_icon, fill="gray")
 
-    # Ensure the thumbnails directory exists
     os.makedirs("assets/thumbnails", exist_ok=True)
     img.save(f"assets/thumbnails/{submission.id}.jpg")
     logger.info(f"Thumbnail saved to assets/thumbnails/{submission.id}.jpg")
