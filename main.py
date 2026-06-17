@@ -6,7 +6,7 @@ from gtts import gTTS
 import fetch_content as fetch_content
 from logger import logger
 from thumbnail import create_thumbnail
-from videoeditor import create_video
+from videoeditor import create_videos
 from youtube import upload_video
 
 OUTPUT_FOLDER = "assets/audio"
@@ -34,9 +34,15 @@ def main() -> None:
         logger.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
 
         create_thumbnail(submission)
-        create_video(submission)
+        videos = create_videos(submission)
 
-        upload_video(submission=submission, video_file=f"output/{submission_id}.mov")
+        for video_file, part, total_parts in videos:
+            upload_video(
+                submission=submission,
+                video_file=video_file,
+                part=part,
+                total_parts=total_parts,
+            )
 
     job_end = datetime.now(timezone.utc)
     job_end_str = job_end.strftime("%Y-%m-%dT%H:%M:%SZ")
