@@ -9,4 +9,5 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 1
 fi
 
-npx --yes @commitlint/cli@19 --config commitlint.config.cjs --from "$FROM" --to "$TO"
+npx --yes -p @commitlint/cli@19 -p @commitlint/config-conventional@19 \
+  commitlint --config commitlint.config.cjs --from "$FROM" --to "$TO"
