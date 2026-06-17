@@ -3,7 +3,9 @@ import os
 import praw
 from dotenv import load_dotenv
 
+from config import load_reddit_config
 from logger import logger
+from reddit_sources import parse_subreddit_sources
 
 logger = logger
 
@@ -21,21 +23,27 @@ def create_password_flow_with_praw() -> praw.Reddit:
 
 
 def fetch_submissions(reddit: praw.Reddit) -> list[praw.models.Submission]:
-    """
-    Fetch the top daily submission from the AITAH subreddit.
-    """
-    list_of_submissions = []
-    for submission in reddit.subreddit("AITAH").top(time_filter="day", limit=1):
-        list_of_submissions.append(submission)
+    """Fetch top posts from each configured subreddit source."""
+    sources = parse_subreddit_sources(load_reddit_config())
+    submissions: list[praw.models.Submission] = []
 
-    if list_of_submissions:
-        logger.info("Reddit client created successfully with PRAW.")
+    for source in sources:
+        fetched = 0
+        for submission in reddit.subreddit(source.name).top(time_filter=source.time_filter, limit=source.limit):
+            submissions.append(submission)
+            fetched += 1
+        logger.info(
+            f"Fetched {fetched} submission(s) from r/{source.name} "
+            f"(time_filter={source.time_filter}, limit={source.limit})."
+        )
 
-    return list_of_submissions
+    if submissions:
+        logger.info(f"Fetched {len(submissions)} total submission(s) from {len(sources)} subreddit(s).")
+
+    return submissions
 
 
 if __name__ == "__main__":
-    # Example usage
     reddit = create_password_flow_with_praw()
     submissions = fetch_submissions(reddit)
-    logger.info(f"Fetched {len(submissions)} submission(s) from AITAH subreddit.")
+    logger.info(f"Fetched {len(submissions)} submission(s) from configured subreddits.")

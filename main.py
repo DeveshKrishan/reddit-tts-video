@@ -17,7 +17,6 @@ def main() -> None:
     job_start_str = job_start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
-    submissions = submissions[:1]  # Limit to the first submission for simplicity
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     for submission in submissions:
