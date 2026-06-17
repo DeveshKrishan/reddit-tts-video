@@ -71,7 +71,7 @@ these standards before flagging violations.
 
 **This repo — check before flagging RULE 1 issues:**
 
-- Conventional commits (`feat:`, `fix:`, `test:`, `ci:`, etc.) — see `.cursor/skills/pr-creator/SKILL.md`
+- Conventional commits (`feat:`, `fix:`, `test:`, `ci:`, etc.) — see `.cursor/agents/pr-creator.md`
 - Pre-commit: ruff lint/format, mypy (`--ignore-missing-imports`)
 - CI (`checks.yaml`): unittest + commitlint only; no full dependency install
 - Config files: `youtube_config.yaml`, `reddit_config.yaml`, `config.py`
@@ -142,7 +142,7 @@ You have full read access. 10+ file reads in one call is normal and encouraged.
   - [ ] Note "Constraints & Assumptions" — review within these bounds
   - [ ] Note "Decision Log" — accept these decisions as given
 - [ ] What project-specific constraints apply?
-- [ ] Read `.cursor/skills/pr-creator/SKILL.md` if reviewing commits or PRs
+- [ ] Read `.cursor/agents/pr-creator.md` if reviewing commits or PRs
  </discovery_checklist>
 
 <handle_missing_documentation>
