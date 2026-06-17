@@ -41,3 +41,21 @@ class TestRedditConfig(unittest.TestCase):
         self.assertEqual(source.name, "AITAH")
         self.assertEqual(source.time_filter, "day")
         self.assertEqual(source.limit, 1)
+
+    def test_per_subreddit_limit_override(self) -> None:
+        config = {
+            "defaults": {"limit": 1},
+            "subreddits": [
+                {"name": "AITAH", "limit": 3},
+                {"name": "AmIOverreacting", "limit": 2},
+            ],
+        }
+        sources = parse_subreddit_sources(config)
+
+        self.assertEqual([(source.name, source.limit) for source in sources], [("AITAH", 3), ("AmIOverreacting", 2)])
+
+    def test_rejects_invalid_limit(self) -> None:
+        config = {"subreddits": [{"name": "AITAH", "limit": 0}]}
+
+        with self.assertRaises(ValueError):
+            parse_subreddit_sources(config)

@@ -1,8 +1,10 @@
 defaults:
   time_filter: day
-  limit: 1
+  limit: 1 # top posts to fetch per subreddit when limit is not set on the entry
   enabled: true
 
 subreddits:
   - name: AITAH
+    limit: 1
   - name: AmIOverreacting
+    limit: 1

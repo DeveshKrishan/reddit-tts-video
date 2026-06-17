@@ -21,11 +21,14 @@ def parse_subreddit_sources(config: dict) -> list[SubredditSource]:
             entry = {"name": entry}
         if not entry.get("enabled", default_enabled):
             continue
+        limit = entry.get("limit", default_limit)
+        if not isinstance(limit, int) or limit < 1:
+            raise ValueError(f"Subreddit {entry['name']!r} limit must be a positive integer, got {limit!r}")
         sources.append(
             SubredditSource(
                 name=entry["name"],
                 time_filter=entry.get("time_filter", default_time_filter),
-                limit=entry.get("limit", default_limit),
+                limit=limit,
             )
         )
 
