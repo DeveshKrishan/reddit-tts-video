@@ -3,3 +3,21 @@ privacy_status: "public"
 scopes:
   - "https://www.googleapis.com/auth/youtube.upload"
   - "https://www.googleapis.com/auth/youtube.force-ssl"
+
+# YouTube Shorts output settings (9:16 vertical)
+shorts:
+  enabled: true
+  width: 1080
+  height: 1920
+  fps: 30
+  # YouTube Shorts maximum duration (3 minutes)
+  max_duration_seconds: 180
+  long_content_strategy: split  # split | trim
+  crop_mode: center  # center-crop landscape footage to 9:16
+  subtitle_font_size: 42
+  subtitle_position: lower_third  # center | lower_third
+  add_hashtag: true  # append #Shorts to the upload description
+
+thumbnail:
+  width: 1080
+  height: 1920

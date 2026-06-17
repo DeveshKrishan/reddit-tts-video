@@ -4,6 +4,7 @@ import textwrap
 import praw
 from PIL import Image, ImageDraw, ImageFont
 
+from config import load_config
 from logger import logger
 
 
@@ -12,7 +13,9 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
     Create a YouTube thumbnail for the submission with an orange background, title, and author.
     """
 
-    width, height = 1280, 720
+    thumbnail_config = load_config().get("thumbnail", {})
+    width = thumbnail_config.get("width", 1080)
+    height = thumbnail_config.get("height", 1920)
     background_color = (255, 255, 255)  # White
     title = submission.title
 

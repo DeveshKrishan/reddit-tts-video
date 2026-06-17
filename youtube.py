@@ -1,12 +1,12 @@
 import os
 
 import praw
-import yaml
 from dotenv import load_dotenv
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+from config import load_config
 from logger import logger
 
 DEBUG = False
@@ -26,16 +26,21 @@ def get_credentials(scopes: list[str]) -> Credentials:
     return creds
 
 
-def upload_video(submission: praw.models.Submission, video_file: str) -> None:
+def upload_video(
+    submission: praw.models.Submission,
+    video_file: str,
+    part: int | None = None,
+    total_parts: int | None = None,
+) -> None:
     """
     Uploads a video to YouTube using info from a PRAW submission object and a YAML config for static/auth settings.
     """
     load_dotenv()
 
-    with open("youtube_config.yaml", "r") as f:
-        config = yaml.safe_load(f)
+    config = load_config()
     category_id = config.get("category_id")
     privacy_status = config.get("privacy_status")
+    shorts_config = config.get("shorts", {})
 
     if not category_id or not privacy_status:
         raise ValueError("Category ID and Privacy Status must be set in youtube_config.yaml")
@@ -53,11 +58,23 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
     youtube = build("youtube", "v3", credentials=creds)
 
     # Build a safe, short description using only title, author, and subreddit (no link)
-    description = f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n\nIf you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\nShare with your friends and let us know your thoughts below."
+    description = (
+        f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n\n"
+        "If you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\n"
+        "Share with your friends and let us know your thoughts below."
+    )
+    if part and total_parts and total_parts > 1:
+        description = f"Part {part} of {total_parts}\n\n{description}"
+    if shorts_config.get("enabled") and shorts_config.get("add_hashtag", True):
+        description += "\n\n#Shorts"
 
     safe_title = submission.title if submission.title else "Reddit Story"
     safe_title = "".join(c for c in safe_title if c.isprintable())
-    safe_title = safe_title[:100]  # YouTube title max length
+    if part and total_parts and total_parts > 1:
+        suffix = f" (Part {part}/{total_parts})"
+        safe_title = safe_title[: 100 - len(suffix)] + suffix
+    else:
+        safe_title = safe_title[:100]
 
     body = {
         "snippet": {
@@ -72,7 +89,10 @@ def upload_video(submission: praw.models.Submission, video_file: str) -> None:
 
     request = youtube.videos().insert(part=",".join(body.keys()), body=body, media_body=media)
 
-    logger.info(f"Uploading video: {submission.title}")
+    upload_label = submission.title
+    if part and total_parts and total_parts > 1:
+        upload_label = f"{submission.title} (Part {part}/{total_parts})"
+    logger.info(f"Uploading video: {upload_label}")
     response = None
     while response is None:
         status, response = request.next_chunk()
