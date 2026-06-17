@@ -4,10 +4,13 @@ set -euo pipefail
 FROM="${1:-main}"
 TO="${2:-HEAD}"
 
-if ! command -v npx >/dev/null 2>&1; then
-  echo "npx is required to run commitlint"
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm is required to run commitlint"
   exit 1
 fi
 
-npx --yes -p @commitlint/cli@19 -p @commitlint/config-conventional@19 \
-  commitlint --config commitlint.config.cjs --from "$FROM" --to "$TO"
+if [ ! -d node_modules/@commitlint/cli ]; then
+  npm install
+fi
+
+npx commitlint --config commitlint.config.cjs --from "$FROM" --to "$TO"
