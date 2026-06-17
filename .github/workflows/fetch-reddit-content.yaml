@@ -2,7 +2,7 @@ name: Reddit Video Editor
 
 on:
   schedule:
-    - cron: '0 5 * * *' # 10pm PST (05:00 UTC)
+    - cron: '30 1 * * *' # 5:30pm PST (01:30 UTC)
 
 jobs:
   run-main:

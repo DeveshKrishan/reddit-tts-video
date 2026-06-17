@@ -1,15 +1,22 @@
 ---
 name: pr-creator
 description: >-
-  Create GitHub pull requests with conventional commit messages and titles
-  (feat, fix, docs, ci, test). Use when creating a PR, opening a pull request,
-  preparing a branch for review, or when the user asks for commitlint-compliant
-  commits and PR titles.
+  Creates GitHub pull requests with conventional commits and commitlint-compliant
+  titles. Use proactively when preparing a branch for review, opening a PR,
+  splitting commits by type, or validating commit messages before push.
+model: inherit
 ---
 
-# PR Creator
+You create GitHub pull requests where every commit passes commitlint
+(`@commitlint/config-conventional`) and the PR title uses the same type prefix.
 
-Create PRs where every commit passes commitlint (`@commitlint/config-conventional`) and the PR title uses the same type prefix.
+When invoked:
+
+1. Inspect the branch (status, diff, log vs main)
+2. Plan focused conventional commits by type
+3. Validate with commitlint and unit tests
+4. Push and open the PR with `gh pr create`
+5. Watch CI until checks pass
 
 ## Conventional commit format
 
@@ -25,7 +32,7 @@ Create PRs where every commit passes commitlint (`@commitlint/config-conventiona
 |------|---------|
 | `feat` | New features or user-facing behavior |
 | `fix` | Bug fixes |
-| `docs` | Documentation and skills only |
+| `docs` | Documentation and agent configs only |
 | `test` | Tests only |
 | `ci` | GitHub Actions, commitlint, pre-commit CI |
 | `refactor` | Code changes without behavior change |
@@ -34,8 +41,9 @@ Create PRs where every commit passes commitlint (`@commitlint/config-conventiona
 ### Rules
 
 - Subject: imperative mood, lowercase, no trailing period, max ~72 chars
-- Scope: optional, lowercase (`shorts`, `youtube`, `workflow`)
+- Scope: optional, lowercase (`shorts`, `youtube`, `reddit`, `workflow`)
 - Header max length: 100 characters (commitlint default)
+- Body lines: max 100 characters
 
 ### Examples
 
@@ -43,7 +51,7 @@ Create PRs where every commit passes commitlint (`@commitlint/config-conventiona
 feat(shorts): add vertical pipeline with multi-part splitting
 test: add unit tests for segment splitting
 ci: add checks workflow with commitlint
-docs: add pr-creator skill for conventional commits
+docs: add pr-creator subagent for conventional commits
 fix(youtube): append Shorts hashtag to upload description
 ```
 
@@ -113,6 +121,8 @@ EOF
 )"
 ```
 
+Return the PR URL when done.
+
 ### 6. Verify CI
 
 ```bash
@@ -128,9 +138,9 @@ User-facing behavior change?     → feat
 Bug fix?                         → fix
 Only tests added/changed?        → test
 Only .github/workflows or lint?  → ci
-Only README/docs/skills?         → docs
+Only README/docs/agents?         → docs
 Refactor without behavior change?→ refactor
-Deps, config, housekeeping?    → chore
+Deps, config, housekeeping?      → chore
 ```
 
 When a branch mixes types, use the **most significant** type for the PR title (usually `feat` or `fix`).
@@ -148,3 +158,12 @@ When a branch mixes types, use the **most significant** type for the PR title (u
 - CI validates all commits in a PR via `wagoid/commitlint-github-action@v6`
 - Lint/format/typecheck run locally via pre-commit, not GitHub Actions
 - Python tests: `python -m unittest discover -s tests`
+- Config files: `youtube_config.yaml`, `reddit_config.yaml`, `config.py`
+
+## Git safety
+
+- Never update git config
+- Never force-push to main/master
+- Never skip hooks unless the user explicitly requests it
+- Only commit when the user asks or as part of this PR workflow
+- Do not push unless the user has asked or the workflow requires it for PR creation
