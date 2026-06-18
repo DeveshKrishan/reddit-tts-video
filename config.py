@@ -4,6 +4,7 @@ import yaml
 
 CONFIG_PATH = Path("youtube_config.yaml")
 REDDIT_CONFIG_PATH = Path("reddit_config.yaml")
+SFX_CONFIG_PATH = Path("sfx_config.yaml")
 
 DEBUG = False
 
@@ -15,6 +16,12 @@ def _reddit_environment() -> str:
 def load_config() -> dict:
     """Load pipeline configuration from youtube_config.yaml."""
     with CONFIG_PATH.open("r") as f:
+        return yaml.safe_load(f) or {}
+
+
+def load_sfx_config() -> dict:
+    """Load sound effects configuration from sfx_config.yaml."""
+    with SFX_CONFIG_PATH.open("r") as f:
         return yaml.safe_load(f) or {}
 
 

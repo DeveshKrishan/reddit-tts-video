@@ -5,7 +5,7 @@ import whisper
 from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip, vfx
 from moviepy.video.fx.Loop import Loop
 
-from config import load_config
+from config import load_config, load_sfx_config
 from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
@@ -132,7 +132,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     result = model.transcribe(audio_path, word_timestamps=True)
     segments = result["segments"]
 
-    sfx_section = config.get("sound_effects", {})
+    sfx_section = load_sfx_config()
     sfx_enabled = sfx_section.get("enabled", False)
     sfx_confidence = sfx_section.get("confidence_threshold", 0.8)
     sfx_config = sfx_section.get("sfx", {}) if sfx_enabled else None

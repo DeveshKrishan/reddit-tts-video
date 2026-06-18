@@ -1,0 +1,53 @@
+enabled: true
+confidence_threshold: 0.8
+
+# Paths to royalty-free SFX files (download from YouTube Audio Library).
+# Files are gitignored — add them locally under assets/sfx/.
+# See assets/sfx/README.md for the full list of required filenames.
+sfx:
+  profanity: assets/sfx/bleep.wav
+  shocking: assets/sfx/gasp.wav
+  funny: assets/sfx/rimshot.wav
+  sad: assets/sfx/sad_sting.wav
+  suspense: assets/sfx/riser.wav
+
+# Trigger keywords per effect category.
+# Add, remove, or reorder keywords here without touching any Python code.
+# Each category fires at most once per video (the first matching keyword wins).
+keywords:
+  shocking:
+    - unbelievable
+    - no way
+    - insane
+    - wtf
+    - shocked
+    - omg
+    - horrified
+    - cannot believe
+    - mind blown
+    - jaw drop
+  funny:
+    - lmao
+    - lol
+    - hilarious
+    - rofl
+    - im dead
+    - "i'm dead"
+    - dying
+    - hahahaha
+  sad:
+    - died
+    - passed away
+    - heartbroken
+    - crying
+    - tragic
+    - devastating
+    - grief
+    - mourning
+  suspense:
+    - then it happened
+    - what happened next
+    - suddenly
+    - out of nowhere
+    - without warning
+    - to my horror
