@@ -132,12 +132,6 @@ def upload_video(
         logger.info("Upload complete!")
         logger.info(f"Video ID: {response['id']}")
 
-        thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
-        if os.path.exists(thumbnail_path):
-            youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()
-            logger.info(f"Thumbnail uploaded from {thumbnail_path}")
-        else:
-            logger.info(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")
     except RefreshError as exc:
         logger.error(REFRESH_TOKEN_HELP)
         raise RefreshError(f"{exc}. {REFRESH_TOKEN_HELP}") from exc

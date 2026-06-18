@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import fetch_content as fetch_content
 from config import load_config
 from logger import logger
-from thumbnail import create_thumbnail
 from tts import generate_tts
 from videoeditor import create_videos
 from youtube import upload_video
@@ -38,7 +37,6 @@ def main() -> None:
 
         logger.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
 
-        create_thumbnail(submission)
         videos = create_videos(submission)
 
         for video_file, part, total_parts in videos:
