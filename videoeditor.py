@@ -2,11 +2,11 @@ import os
 import ssl
 
 import whisper
-from moviepy import AudioFileClip, CompositeVideoClip, TextClip, VideoFileClip, vfx
+from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip, vfx
 from moviepy.video.fx.Loop import Loop
-from moviepy.video.tools.subtitles import SubtitlesClip
 
 from config import load_config
+from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
 
@@ -66,24 +66,13 @@ def _render_part(
     else:
         clip = base_clip.subclipped(0, duration)
 
-    subtitles = [
-        ((float(segment["start"]) - part_start, float(segment["end"]) - part_start), segment["text"].lower())
-        for segment in part_segments
-    ]
-
-    def make_textclip(txt: str) -> TextClip:
-        return TextClip(
-            text=txt,
-            font_size=subtitle_font_size,
-            color="white",
-            text_align="center",
-            stroke_color="black",
-            stroke_width=4,
-            size=(clip.w - 80, None),
-            method="caption",
-        )
-
-    subtitles_clip = SubtitlesClip(subtitles=subtitles, make_textclip=make_textclip)
+    subtitles_clip = create_highlighted_subtitles_clip(
+        part_segments=part_segments,
+        part_start=part_start,
+        duration=duration,
+        video_width=clip.w,
+        font_size=subtitle_font_size,
+    )
     clip = clip.with_audio(part_audio)
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(_subtitle_position(clip, subtitle_position))])
     final_video.write_videofile(output_path, fps=fps)
@@ -111,7 +100,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     audio = AudioFileClip(audio_path)
 
     model = whisper.load_model("base")
-    result = model.transcribe(audio_path)
+    result = model.transcribe(audio_path, word_timestamps=True)
     segments = result["segments"]
 
     if audio.duration <= max_duration:
