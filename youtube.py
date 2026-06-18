@@ -6,10 +6,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-from config import load_config
+from config import DEBUG, load_config
 from logger import logger
-
-DEBUG = False
 
 
 def get_credentials(scopes: list[str]) -> Credentials:
