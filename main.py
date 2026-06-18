@@ -1,11 +1,11 @@
 import os
 from datetime import datetime, timezone
 
-from gtts import gTTS
-
 import fetch_content as fetch_content
+from config import load_config
 from logger import logger
 from thumbnail import create_thumbnail
+from tts import generate_tts
 from videoeditor import create_videos
 from youtube import upload_video
 
@@ -16,6 +16,9 @@ def main() -> None:
     job_start = datetime.now(timezone.utc)
     job_start_str = job_start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    config = load_config()
+    tts_config = config.get("tts", {})
+
     submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
@@ -25,10 +28,13 @@ def main() -> None:
         author = submission.author.name if submission.author else "Unknown"
         submission_id = submission.id
 
-        # generate audio from the content
-        tts = gTTS(content)
-        # save locally
-        tts.save(f"{OUTPUT_FOLDER}/{submission_id}.mp3")
+        generate_tts(
+            text=content,
+            output_path=f"{OUTPUT_FOLDER}/{submission_id}.mp3",
+            voice=tts_config.get("voice", "en-US-GuyNeural"),
+            rate=tts_config.get("rate", "+10%"),
+            pitch=tts_config.get("pitch", "+0Hz"),
+        )
 
         logger.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")
 

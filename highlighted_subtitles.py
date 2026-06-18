@@ -8,6 +8,14 @@ TEXT_COLOR = "white"
 STROKE_COLOR = "black"
 STROKE_WIDTH = 4
 LINE_SPACING = 8
+# Extra pixels added between words on top of a normal space, giving the pop
+# animation room to expand without clipping into adjacent words.
+WORD_EXTRA_GAP = 12
+
+# Pop animation: highlighted word scales to this multiplier at peak.
+POP_SCALE_PEAK = 1.10
+# Fraction of word duration over which the scale-up completes (ease-out cubic).
+POP_RAMP_FRACTION = 0.2
 
 
 def _load_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -51,7 +59,9 @@ def _wrap_word_lines(words: list[str], font: ImageFont.ImageFont, max_width: int
     for word in words:
         trial = " ".join(current + [word]) if current else word
         bbox = draw.textbbox((0, 0), trial, font=font, stroke_width=STROKE_WIDTH)
-        if bbox[2] - bbox[0] > max_width and current:
+        # Account for extra inter-word gap when checking if line exceeds max width.
+        extra = WORD_EXTRA_GAP * max(0, len(current))
+        if bbox[2] - bbox[0] + extra > max_width and current:
             lines.append(current)
             current = [word]
         else:
@@ -62,13 +72,58 @@ def _wrap_word_lines(words: list[str], font: ImageFont.ImageFont, max_width: int
     return lines or [[]]
 
 
+def _pop_scale(progress: float) -> float:
+    """Ease-out cubic: 1.0 → POP_SCALE_PEAK over first POP_RAMP_FRACTION of word, then hold."""
+    if progress < POP_RAMP_FRACTION:
+        t = progress / POP_RAMP_FRACTION
+        ease = 1.0 - (1.0 - t) ** 3
+        return 1.0 + (POP_SCALE_PEAK - 1.0) * ease
+    return POP_SCALE_PEAK
+
+
+def _apply_pop_scale(
+    image: Image.Image,
+    word_bbox: tuple[int, int, int, int],
+    scale: float,
+) -> Image.Image:
+    """Scale up the highlighted word region and overlay it on the image."""
+    if scale <= 1.0:
+        return image
+
+    x, y, w, h = int(word_bbox[0]), int(word_bbox[1]), int(word_bbox[2]), int(word_bbox[3])
+    if w <= 0 or h <= 0:
+        return image
+
+    word_region = image.crop((x, y, x + w, y + h))
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    scaled = word_region.resize((new_w, new_h), Image.LANCZOS)
+
+    result = image.copy()
+
+    # Erase the original word so it doesn't bleed through the scaled version.
+    erase = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    result.paste(erase, (x, y))
+
+    paste_x = int(x + (w - new_w) / 2)
+    paste_y = int(y + (h - new_h) / 2)
+    mask = scaled if scaled.mode == "RGBA" else None
+    result.paste(scaled, (paste_x, paste_y), mask)
+    return result
+
+
 def render_highlighted_text(
     words: list[str],
     highlight_index: int | None,
     font_size: int,
     max_width: int,
-) -> Image.Image:
-    """Render wrapped caption text with one highlighted word."""
+) -> tuple[Image.Image, tuple[int, int, int, int] | None]:
+    """Render wrapped caption text with one highlighted word.
+
+    Returns:
+        A tuple of (rendered image, highlighted_word_bbox).
+        highlighted_word_bbox is (x, y, w, h) within the image, or None.
+    """
     font = _load_font(font_size)
     measure = Image.new("RGBA", (max_width, 10), (0, 0, 0, 0))
     measure_draw = ImageDraw.Draw(measure)
@@ -91,6 +146,7 @@ def render_highlighted_text(
     draw = ImageDraw.Draw(image)
     y = 0
     word_counter = 0
+    highlighted_word_bbox: tuple[int, int, int, int] | None = None
 
     for line, line_width, line_height in line_metrics:
         x = (max_width - line_width) // 2
@@ -105,11 +161,20 @@ def render_highlighted_text(
                 stroke_fill=STROKE_COLOR,
             )
             word_bbox = draw.textbbox((x, y), word, font=font, stroke_width=STROKE_WIDTH)
-            x = word_bbox[2] + measure_draw.textlength(" ", font=font)
+
+            if word_counter == highlight_index:
+                highlighted_word_bbox = (
+                    int(word_bbox[0]),
+                    int(word_bbox[1]),
+                    int(word_bbox[2] - word_bbox[0]),
+                    int(word_bbox[3] - word_bbox[1]),
+                )
+
+            x = word_bbox[2] + measure_draw.textlength(" ", font=font) + WORD_EXTRA_GAP
             word_counter += 1
         y += line_height + LINE_SPACING
 
-    return image
+    return image, highlighted_word_bbox
 
 
 def create_highlighted_subtitles_clip(
@@ -119,17 +184,28 @@ def create_highlighted_subtitles_clip(
     video_width: int,
     font_size: int,
 ) -> VideoClip:
-    """Build a subtitle clip that highlights the active spoken word in light green."""
+    """Build a subtitle clip that highlights the active spoken word in light green,
+    with a pop (scale-in) animation on each newly highlighted word."""
     max_text_width = video_width - 80
     segment_words_list = [(segment, segment_words(segment)) for segment in part_segments]
 
-    render_cache: dict[tuple[int, int | None], Image.Image] = {}
+    # Cache: (segment_index, highlight_index | None) → (image, highlighted_word_bbox)
+    render_cache: dict[tuple[int, int | None], tuple[Image.Image, tuple[int, int, int, int] | None]] = {}
     for segment_index, (_, words) in enumerate(segment_words_list):
         word_text = [word_info["word"] for word_info in words]
         render_cache[(segment_index, None)] = render_highlighted_text(word_text, None, font_size, max_text_width)
         for highlight_index in range(len(words)):
             render_cache[(segment_index, highlight_index)] = render_highlighted_text(
                 word_text, highlight_index, font_size, max_text_width
+            )
+
+    # Word timing lookup: (segment_index, word_index) → (start, end) relative to part_start
+    word_timings: dict[tuple[int, int], tuple[float, float]] = {}
+    for segment_index, (_, words) in enumerate(segment_words_list):
+        for word_index, word_info in enumerate(words):
+            word_timings[(segment_index, word_index)] = (
+                float(word_info["start"]) - part_start,
+                float(word_info["end"]) - part_start,
             )
 
     def active_state(t: float) -> tuple[int, int | None] | None:
@@ -147,18 +223,35 @@ def create_highlighted_subtitles_clip(
                 return segment_index, highlight_index
         return None
 
+    def _animated_image(state: tuple[int, int | None], t: float) -> Image.Image:
+        """Return the subtitle image with the pop animation applied for time t."""
+        image, word_bbox = render_cache[state]
+        segment_index, highlight_index = state
+
+        if highlight_index is not None and word_bbox is not None:
+            timing = word_timings.get((segment_index, highlight_index))
+            if timing:
+                word_start, word_end = timing
+                word_dur = word_end - word_start
+                if word_dur > 0:
+                    progress = max(0.0, min(1.0, (t - word_start) / word_dur))
+                    scale = _pop_scale(progress)
+                    if scale > 1.0:
+                        return _apply_pop_scale(image, word_bbox, scale)
+
+        return image
+
     def frame_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
             return np.zeros((1, max_text_width, 3), dtype=np.uint8)
-        image = render_cache[state]
-        return np.array(image.convert("RGB"))
+        return np.array(_animated_image(state, t).convert("RGB"))
 
     def mask_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
             return np.zeros((1, max_text_width), dtype=float)
-        alpha = np.array(render_cache[state].split()[-1], dtype=float) / 255.0
+        alpha = np.array(_animated_image(state, t).split()[-1], dtype=float) / 255.0
         return alpha
 
     clip = VideoClip(frame_function, duration=duration, has_constant_size=False)

@@ -1,0 +1,19 @@
+---
+description: Git commit/push workflow — always wait for user confirmation
+alwaysApply: true
+---
+
+# Git Workflow
+
+## Commit & Push
+
+**Never** commit or push automatically after making code changes.
+
+Always:
+1. Make the requested changes
+2. Show a summary of what was changed
+3. Wait for the user to explicitly say "commit", "push", or similar confirmation before running any `git commit` or `git push`
+
+## DEBUG Flag
+
+`config.py` contains `DEBUG = False`. The user may set it to `True` locally for dev runs — **never commit `DEBUG = True`**. If it's `True` when committing, revert it to `False` first (or stash), then restore after pushing.

@@ -1,0 +1,36 @@
+category_id: "22"
+privacy_status: "public"
+scopes:
+  - "https://www.googleapis.com/auth/youtube.upload"
+  - "https://www.googleapis.com/auth/youtube.force-ssl"
+
+# YouTube Shorts output settings (9:16 vertical)
+shorts:
+  enabled: true
+  width: 1080
+  height: 1920
+  fps: 30
+  # YouTube Shorts maximum duration (3 minutes)
+  max_duration_seconds: 180
+  long_content_strategy: split  # split | trim
+  crop_mode: center  # center-crop landscape footage to 9:16
+  subtitle_font_size: 42
+  subtitle_position: lower_third  # center | lower_third
+  # Distance in pixels from the bottom of the frame to the bottom of the subtitle block.
+  # Keeps subtitles clear of YouTube Shorts UI buttons (~25% from bottom = ~480px on 1920px).
+  subtitle_bottom_margin: 320
+  add_hashtag: true               # append #Shorts to the upload description
+  add_subreddit_hashtag: true     # append #SubredditName to the video title
+
+thumbnail:
+  width: 1080
+  height: 1920
+
+# Text-to-speech settings (Microsoft Edge neural voices — free, no API key needed).
+# Voice options: en-US-GuyNeural, en-US-ChristopherNeural, en-US-AriaNeural, en-US-JennyNeural
+# rate:  CSS Speech relative value — "+10%" = 10% faster, "-5%" = 5% slower, "+0%" = default
+# pitch: Hz offset — "+0Hz" = default, "+5Hz" = slightly higher
+tts:
+  voice: en-US-GuyNeural
+  rate: "+10%"
+  pitch: "+0Hz"
