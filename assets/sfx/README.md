@@ -1,8 +1,9 @@
 # Sound Effects
 
-Place your `.wav` or `.mp3` SFX files here. Download royalty-free meme sounds from the
-[YouTube Audio Library](https://studio.youtube.com) (Sound Effects tab) — these are
-pre-cleared for YouTube uploads.
+Custom `.wav` or `.mp3` SFX files live here and are tracked in the repo so every
+contributor gets a working setup out of the box. For royalty-free options, the
+[YouTube Audio Library](https://studio.youtube.com) (Sound Effects tab) is a good
+source — files from there are pre-cleared for YouTube uploads.
 
 ## Required files
 
@@ -18,4 +19,3 @@ pre-cleared for YouTube uploads.
 
 - File names must match the paths configured in `configs/sfx_config.yaml` under `sfx`
 - Short clips (0.5–3s) work best so they don't overlap each other
-- All files are gitignored — add them locally or via CI secrets
