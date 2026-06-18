@@ -14,7 +14,7 @@ def create_password_flow_with_praw() -> praw.Reddit:
     """
     Create a Reddit client using PRAW (Python Reddit API Wrapper) with password authentication.
     """
-    load_dotenv()
+    load_dotenv(override=True)
     return praw.Reddit(
         client_id=os.getenv("CLIENT_ID"),
         client_secret=os.getenv("CLIENT_SECRET"),
