@@ -11,7 +11,7 @@ class TestRedditConfig(unittest.TestCase):
         sources = parse_subreddit_sources(load_reddit_config())
         names = [source.name for source in sources]
 
-        self.assertEqual(names, ["AITAH", "AmIOverreacting"])
+        self.assertEqual(names, ["AITAH", "AmIOverreacting", "EntitledPeople"])
 
     def test_loads_development_subreddits(self) -> None:
         with patch.object(config, "DEBUG", True):
