@@ -1,0 +1,36 @@
+# Words that trigger a bleep cue.
+# Multi-word phrases (e.g. "son of a bitch") are matched against the raw Reddit
+# text; each matching Whisper word in the phrase gets its own bleep cue.
+words:
+  - ass
+  - asshole
+  - bastard
+  - bitch
+  - bullshit
+  - crap
+  - cunt
+  - damn
+  - dick
+  - douche
+  - douchebag
+  - fag
+  - faggot
+  - fuck
+  - fucked
+  - fucker
+  - fucking
+  - goddamn
+  - hell
+  - jackass
+  - jerk
+  - motherfucker
+  - piss
+  - pissed
+  - pussy
+  - shit
+  - shithead
+  - slut
+  - son of a bitch
+  - twat
+  - whore
+  - wtf

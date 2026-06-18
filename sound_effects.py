@@ -12,13 +12,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import yaml
+
 if TYPE_CHECKING:
     import numpy as np
     from moviepy import AudioArrayClip, AudioFileClip, CompositeAudioClip
 
 from logger import logger
 
-PROFANITY_LIST_PATH = Path("assets/profanity_list.txt")
+PROFANITY_LIST_PATH = Path("configs/profanity_list.yaml")
 
 
 @dataclass
@@ -33,7 +35,8 @@ def _load_profanity_list() -> set[str]:
     if not PROFANITY_LIST_PATH.exists():
         logger.warning(f"Profanity list not found at {PROFANITY_LIST_PATH}; bleep detection disabled.")
         return set()
-    return {w.strip().lower() for w in PROFANITY_LIST_PATH.read_text().splitlines() if w.strip()}
+    data = yaml.safe_load(PROFANITY_LIST_PATH.read_text()) or {}
+    return {w.strip().lower() for w in data.get("words", []) if w.strip()}
 
 
 def _flatten_word_timestamps(segments: list[dict]) -> list[dict]:
