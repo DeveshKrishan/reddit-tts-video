@@ -44,7 +44,64 @@
 - Phase 4: Capture metadata about processes
     - Have LLMs store metrics about render time, memory usage to improve efficency in a database
 
-## 5. Risks & Unknowns
+## 5. Sound Effects Engine
+
+### Overview
+
+Automatically overlay contextual sound effects onto the generated video based on the words and sentiment in the narrated text. The goal is to increase engagement by making videos feel more dynamic and reactive — similar to the "reaction sounds" used in popular Reddit TTS channels.
+
+### Effect Categories
+
+| Category | Trigger | Example Sound |
+|---|---|---|
+| **Profanity bleep** | Detected curse words (via word list) | TV-style bleep tone over the word's timestamp |
+| **Shocking / OMG** | Keywords: `unbelievable`, `no way`, `insane`, `wtf`, `shocked`, `omg`, `horrified` | Dramatic sting / gasp SFX |
+| **Funny / Comedic** | Keywords: `lmao`, `lol`, `hilarious`, `rofl`, `dying`, `💀`, `😂` | Rimshot, laugh track, or cartoon boing |
+| **Sad / Emotional** | Keywords: `died`, `passed away`, `heartbroken`, `crying`, `tragic` | Sad violin sting |
+| **Wholesome / Uplifting** | Keywords: `wholesome`, `sweet`, `saved`, `hero`, `amazing`, `heartwarming` | Warm chime or "aww" crowd |
+| **Plot twist** | Keywords: `turns out`, `but wait`, `actually`, `little did I know` | Dramatic reversal sting |
+| **Tension / Suspense** | Keywords: `then it happened`, `what happened next`, `suddenly` | Low drone / suspense riser |
+
+### Implementation Plan
+
+#### Phase 1 — Keyword detection & timestamp mapping
+- Add a `sound_effects.py` module with a `detect_sound_cues(word_timestamps)` function
+- `word_timestamps` come from the existing Whisper output (already produced in `highlighted_subtitles.py`)
+- Each cue returns `{ "effect": "<category>", "start_time": float, "volume": float }`
+- Bleep detection uses a configurable profanity word list (stored in `assets/profanity_list.txt`); other categories use keyword/regex matching
+
+#### Phase 2 — Asset management
+- Store royalty-free SFX files in `assets/sfx/` (e.g. `bleep.wav`, `rimshot.wav`, `gasp.wav`)
+- Add a mapping in `config.yaml` or a new `sfx_config.yaml`:
+  ```yaml
+  sfx:
+    profanity: assets/sfx/bleep.wav
+    shocking: assets/sfx/gasp.wav
+    funny: assets/sfx/rimshot.wav
+    sad: assets/sfx/sad_sting.wav
+    wholesome: assets/sfx/chime.wav
+    plot_twist: assets/sfx/sting.wav
+    suspense: assets/sfx/riser.wav
+  ```
+
+#### Phase 3 — Audio mixing
+- In `videoeditor.py`, after the TTS audio track is assembled, call `mix_sound_effects(tts_audio, cues, sfx_config)` from `sound_effects.py`
+- Use `pydub` or MoviePy's `CompositeAudioClip` to overlay each SFX at its `start_time` with independent volume control
+- For profanity bleeps, duck (mute) the underlying TTS audio for the duration of the word before overlaying the bleep tone
+
+#### Phase 4 — Configuration & toggle
+- Add a `sound_effects_enabled: true/false` flag to `config.yaml` so it can be disabled per-run
+- Allow per-category overrides (e.g. disable bleeps but keep funny SFX)
+- Expose settings in `reddit_config.yaml` under a `sound_effects:` section
+
+### Open Questions
+- Should bleep detection run on the raw Reddit text (before TTS) or on the Whisper transcript (after)?  Using the raw text is more reliable since Whisper sometimes mishears profanity.
+- Do we need a confidence threshold for sentiment keywords to avoid false positives?
+- What royalty-free SFX libraries should we use? (e.g. Freesound.org, ZapSplat, YouTube Audio Library)
+
+---
+
+## 6. Risks & Unknowns
 
 - Technical challenges
     - Storing generated content
