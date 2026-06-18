@@ -10,9 +10,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
-from moviepy import AudioArrayClip, AudioFileClip, CompositeAudioClip, afx
+if TYPE_CHECKING:
+    import numpy as np
+    from moviepy import AudioArrayClip, AudioFileClip, CompositeAudioClip
 
 from logger import logger
 
@@ -180,6 +182,9 @@ def detect_sound_cues(
 
 def _duck_tts(audio: AudioFileClip, profanity_cues: list[SoundCue]) -> AudioArrayClip:
     """Return a copy of the TTS audio with profanity word regions silenced."""
+    import numpy as np
+    from moviepy import AudioArrayClip
+
     fps = audio.fps
     frames: np.ndarray = audio.to_soundarray(fps=fps).copy()
 
@@ -214,6 +219,8 @@ def mix_sound_effects(
     Returns:
         A CompositeAudioClip with the same duration as the input audio.
     """
+    from moviepy import AudioFileClip, CompositeAudioClip, afx
+
     if not cues:
         return CompositeAudioClip([audio])
 
