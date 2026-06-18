@@ -36,9 +36,19 @@ def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, 
     return clip.with_effects([vfx.Resize((target_width, target_height))])
 
 
-def _subtitle_position(clip: VideoFileClip, position: str) -> tuple[str, str | int]:
+def _subtitle_position(
+    clip: VideoFileClip,
+    subtitles_clip,
+    position: str,
+    bottom_margin: int = 320,
+) -> tuple[str, int] | tuple[str, str]:
     if position == "lower_third":
-        return ("center", int(clip.h * 0.72))
+        # Anchor the bottom of the subtitle block at a fixed margin above the frame bottom.
+        # This prevents multi-line wrapping from pushing text off-screen or under
+        # YouTube Shorts' overlay buttons.
+        subtitle_h = subtitles_clip.size[1] if subtitles_clip.size[1] > 1 else 0
+        y = max(0, clip.h - bottom_margin - subtitle_h)
+        return ("center", y)
     return ("center", "center")
 
 
@@ -80,6 +90,7 @@ def _render_part(
     output_path: str,
     subtitle_font_size: int,
     subtitle_position: str,
+    subtitle_bottom_margin: int,
     fps: int,
     all_cues: list[SoundCue] | None = None,
     sfx_config: dict | None = None,
@@ -103,7 +114,8 @@ def _render_part(
         font_size=subtitle_font_size,
     )
     clip = clip.with_audio(part_audio)
-    final_video = CompositeVideoClip([clip, subtitles_clip.with_position(_subtitle_position(clip, subtitle_position))])
+    pos = _subtitle_position(clip, subtitles_clip, subtitle_position, subtitle_bottom_margin)
+    final_video = CompositeVideoClip([clip, subtitles_clip.with_position(pos)])
     final_video.write_videofile(output_path, fps=fps)
 
 
@@ -120,6 +132,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     crop_mode = shorts.get("crop_mode", "center")
     subtitle_font_size = shorts.get("subtitle_font_size", 42)
     subtitle_position = shorts.get("subtitle_position", "lower_third")
+    subtitle_bottom_margin = shorts.get("subtitle_bottom_margin", 320)
 
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
@@ -161,6 +174,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             output_path=output_path,
             subtitle_font_size=subtitle_font_size,
             subtitle_position=subtitle_position,
+            subtitle_bottom_margin=subtitle_bottom_margin,
             fps=fps,
             all_cues=all_cues,
             sfx_config=sfx_config,

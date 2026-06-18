@@ -16,6 +16,9 @@ shorts:
   crop_mode: center  # center-crop landscape footage to 9:16
   subtitle_font_size: 42
   subtitle_position: lower_third  # center | lower_third
+  # Distance in pixels from the bottom of the frame to the bottom of the subtitle block.
+  # Keeps subtitles clear of YouTube Shorts UI buttons (~25% from bottom = ~480px on 1920px).
+  subtitle_bottom_margin: 320
   add_hashtag: true  # append #Shorts to the upload description
 
 thumbnail:
