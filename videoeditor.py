@@ -1,7 +1,7 @@
 import os
 import ssl
 
-import whisper
+import stable_whisper
 from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip, vfx
 from moviepy.video.fx.Loop import Loop
 
@@ -141,9 +141,11 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     base_clip = _crop_to_aspect(VideoFileClip("assets/video/input2.mp4"), target_width, target_height, crop_mode)
     audio = AudioFileClip(audio_path)
 
-    model = whisper.load_model("base")
-    result = model.transcribe(audio_path, word_timestamps=True)
-    segments = result["segments"]
+    # Forced alignment: align the original post text to the TTS audio so subtitles
+    # display the exact words from the post rather than Whisper's transcription guess.
+    model = stable_whisper.load_model("base")
+    result = model.align(audio_path, submission.selftext, language="en")
+    segments = result.to_dict()["segments"]
 
     sfx_section = load_sfx_config()
     sfx_enabled = sfx_section.get("enabled", False)
