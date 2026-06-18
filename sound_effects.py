@@ -79,7 +79,7 @@ def detect_sound_cues(
         raw_text: The original Reddit post body text.
         segments: Whisper result["segments"] list (must have word_timestamps=True).
         keyword_categories: Mapping of effect name → trigger keyword list, loaded
-            from the ``sound_effects.keywords`` section of youtube_config.yaml.
+            from the ``sound_effects.keywords`` section of configs/sfx_config.yaml.
         confidence_threshold: Minimum match confidence; exact keyword matches
             score 1.0, fuzzy matches below this value are discarded.
 
@@ -174,7 +174,7 @@ def mix_sound_effects(
     Args:
         audio: The TTS audio clip for this part (already subclipped to part bounds).
         cues: Sound cues with timestamps relative to this part's start.
-        sfx_config: Mapping of effect name → file path (from youtube_config.yaml).
+        sfx_config: Mapping of effect name → file path (from configs/sfx_config.yaml).
 
     Returns:
         A CompositeAudioClip with the same duration as the input audio.

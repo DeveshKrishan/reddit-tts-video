@@ -16,6 +16,6 @@ pre-cleared for YouTube uploads.
 
 ## Notes
 
-- File names must match the paths configured in `youtube_config.yaml` under `sound_effects.sfx`
+- File names must match the paths configured in `configs/sfx_config.yaml` under `sfx`
 - Short clips (0.5–3s) work best so they don't overlap each other
 - All files are gitignored — add them locally or via CI secrets

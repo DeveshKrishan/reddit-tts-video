@@ -74,7 +74,7 @@ these standards before flagging violations.
 - Conventional commits (`feat:`, `fix:`, `test:`, `ci:`, etc.) — see `.cursor/agents/pr-creator.md`
 - Pre-commit: ruff lint/format, mypy (`--ignore-missing-imports`)
 - CI (`checks.yaml`): unittest + commitlint only; no full dependency install
-- Config files: `youtube_config.yaml`, `reddit_config.yaml`, `config.py`
+- Config files: `configs/youtube_config.yaml`, `configs/reddit_config.yaml`, `configs/sfx_config.yaml`, `config.py`
 - Pipeline: fetch → TTS → video (Shorts 9:16) → YouTube upload
 
 ### RULE 2: Structural Quality

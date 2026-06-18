@@ -9,7 +9,7 @@ class SubredditSource:
 
 
 def parse_subreddit_sources(config: dict) -> list[SubredditSource]:
-    """Expand reddit_config.yaml entries into fetch settings."""
+    """Expand configs/reddit_config.yaml entries into fetch settings."""
     defaults = config.get("defaults", {})
     default_time_filter = defaults.get("time_filter", "day")
     default_limit = defaults.get("limit", 1)

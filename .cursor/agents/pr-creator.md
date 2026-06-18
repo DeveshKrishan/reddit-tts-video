@@ -158,7 +158,7 @@ When a branch mixes types, use the **most significant** type for the PR title (u
 - CI validates all commits in a PR via `wagoid/commitlint-github-action@v6`
 - Lint/format/typecheck run locally via pre-commit, not GitHub Actions
 - Python tests: `python -m unittest discover -s tests`
-- Config files: `youtube_config.yaml`, `reddit_config.yaml`, `config.py`
+- Config files: `configs/youtube_config.yaml`, `configs/reddit_config.yaml`, `configs/sfx_config.yaml`, `config.py`
 
 ## Git safety
 

@@ -65,7 +65,7 @@ def upload_video(
     shorts_config = config.get("shorts", {})
 
     if not category_id or not privacy_status:
-        raise ValueError("Category ID and Privacy Status must be set in youtube_config.yaml")
+        raise ValueError("Category ID and Privacy Status must be set in configs/youtube_config.yaml")
 
     if DEBUG:
         category_id = "22"  # People & Blogs
