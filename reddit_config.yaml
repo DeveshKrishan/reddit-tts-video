@@ -5,7 +5,7 @@ development:
     enabled: true
 
   subreddits:
-    - name: test
+    - name: fuckubisoft
 
 production:
   defaults:

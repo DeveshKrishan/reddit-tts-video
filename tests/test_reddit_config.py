@@ -18,7 +18,7 @@ class TestRedditConfig(unittest.TestCase):
             sources = parse_subreddit_sources(load_reddit_config())
             names = [source.name for source in sources]
 
-        self.assertEqual(names, ["test"])
+        self.assertEqual(names, ["fuckubisoft"])
 
     def test_applies_defaults(self) -> None:
         config = {
