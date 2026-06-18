@@ -8,9 +8,12 @@ TEXT_COLOR = "white"
 STROKE_COLOR = "black"
 STROKE_WIDTH = 4
 LINE_SPACING = 8
+# Extra pixels added between words on top of a normal space, giving the pop
+# animation room to expand without clipping into adjacent words.
+WORD_EXTRA_GAP = 12
 
 # Pop animation: highlighted word scales to this multiplier at peak.
-POP_SCALE_PEAK = 1.25
+POP_SCALE_PEAK = 1.10
 # Fraction of word duration over which the scale-up completes (ease-out cubic).
 POP_RAMP_FRACTION = 0.2
 
@@ -56,7 +59,9 @@ def _wrap_word_lines(words: list[str], font: ImageFont.ImageFont, max_width: int
     for word in words:
         trial = " ".join(current + [word]) if current else word
         bbox = draw.textbbox((0, 0), trial, font=font, stroke_width=STROKE_WIDTH)
-        if bbox[2] - bbox[0] > max_width and current:
+        # Account for extra inter-word gap when checking if line exceeds max width.
+        extra = WORD_EXTRA_GAP * max(0, len(current))
+        if bbox[2] - bbox[0] + extra > max_width and current:
             lines.append(current)
             current = [word]
         else:
@@ -85,7 +90,7 @@ def _apply_pop_scale(
     if scale <= 1.0:
         return image
 
-    x, y, w, h = word_bbox
+    x, y, w, h = int(word_bbox[0]), int(word_bbox[1]), int(word_bbox[2]), int(word_bbox[3])
     if w <= 0 or h <= 0:
         return image
 
@@ -95,8 +100,13 @@ def _apply_pop_scale(
     scaled = word_region.resize((new_w, new_h), Image.LANCZOS)
 
     result = image.copy()
-    paste_x = x + (w - new_w) // 2
-    paste_y = y + (h - new_h) // 2
+
+    # Erase the original word so it doesn't bleed through the scaled version.
+    erase = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    result.paste(erase, (x, y))
+
+    paste_x = int(x + (w - new_w) / 2)
+    paste_y = int(y + (h - new_h) / 2)
     mask = scaled if scaled.mode == "RGBA" else None
     result.paste(scaled, (paste_x, paste_y), mask)
     return result
@@ -154,13 +164,13 @@ def render_highlighted_text(
 
             if word_counter == highlight_index:
                 highlighted_word_bbox = (
-                    word_bbox[0],
-                    word_bbox[1],
-                    word_bbox[2] - word_bbox[0],
-                    word_bbox[3] - word_bbox[1],
+                    int(word_bbox[0]),
+                    int(word_bbox[1]),
+                    int(word_bbox[2] - word_bbox[0]),
+                    int(word_bbox[3] - word_bbox[1]),
                 )
 
-            x = word_bbox[2] + measure_draw.textlength(" ", font=font)
+            x = word_bbox[2] + measure_draw.textlength(" ", font=font) + WORD_EXTRA_GAP
             word_counter += 1
         y += line_height + LINE_SPACING
 
