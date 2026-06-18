@@ -93,8 +93,15 @@ def upload_video(
 
     safe_title = submission.title if submission.title else "Reddit Story"
     safe_title = "".join(c for c in safe_title if c.isprintable())
+
+    suffixes: list[str] = []
     if part and total_parts and total_parts > 1:
-        suffix = f" (Part {part}/{total_parts})"
+        suffixes.append(f"(Part {part}/{total_parts})")
+    if shorts_config.get("add_subreddit_hashtag", True):
+        suffixes.append(f"#{submission.subreddit}")
+
+    if suffixes:
+        suffix = " " + " ".join(suffixes)
         safe_title = safe_title[: 100 - len(suffix)] + suffix
     else:
         safe_title = safe_title[:100]
