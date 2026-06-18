@@ -9,6 +9,7 @@ from config import load_config
 from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
+from sound_effects import SoundCue, detect_sound_cues, mix_sound_effects
 
 
 def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, crop_mode: str) -> VideoFileClip:
@@ -47,6 +48,29 @@ def _output_path(output_folder: str, submission_id: str, part: int, total_parts:
     return f"{output_folder}/{submission_id}_part{part}.mov"
 
 
+def _apply_sfx_to_part(
+    part_audio: AudioFileClip,
+    all_cues: list[SoundCue],
+    part_start: float,
+    part_end: float,
+    sfx_config: dict,
+) -> AudioFileClip:
+    """Filter cues to this part, make timestamps relative, and mix SFX."""
+    part_cues = [
+        SoundCue(
+            effect=c.effect,
+            start_time=c.start_time - part_start,
+            end_time=c.end_time - part_start,
+            volume=c.volume,
+        )
+        for c in all_cues
+        if part_start <= c.start_time < part_end
+    ]
+    if not part_cues:
+        return part_audio
+    return mix_sound_effects(part_audio, part_cues, sfx_config)
+
+
 def _render_part(
     base_clip: VideoFileClip,
     audio: AudioFileClip,
@@ -57,6 +81,8 @@ def _render_part(
     subtitle_font_size: int,
     subtitle_position: str,
     fps: int,
+    all_cues: list[SoundCue] | None = None,
+    sfx_config: dict | None = None,
 ) -> None:
     duration = part_end - part_start
     part_audio = audio.subclipped(part_start, part_end)
@@ -65,6 +91,9 @@ def _render_part(
         clip = Loop(duration=duration).copy().apply(base_clip)
     else:
         clip = base_clip.subclipped(0, duration)
+
+    if all_cues is not None and sfx_config:
+        part_audio = _apply_sfx_to_part(part_audio, all_cues, part_start, part_end, sfx_config)
 
     subtitles_clip = create_highlighted_subtitles_clip(
         part_segments=part_segments,
@@ -103,6 +132,14 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     result = model.transcribe(audio_path, word_timestamps=True)
     segments = result["segments"]
 
+    sfx_section = config.get("sound_effects", {})
+    sfx_enabled = sfx_section.get("enabled", False)
+    sfx_confidence = sfx_section.get("confidence_threshold", 0.8)
+    sfx_config = sfx_section.get("sfx", {}) if sfx_enabled else None
+    all_cues = detect_sound_cues(submission.selftext, segments, sfx_confidence) if sfx_enabled else None
+    if all_cues:
+        logger.info(f"Detected {len(all_cues)} sound cue(s) for submission {submission.id}.")
+
     if audio.duration <= max_duration:
         parts = [(0.0, audio.duration, segments)]
     else:
@@ -124,6 +161,8 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             subtitle_font_size=subtitle_font_size,
             subtitle_position=subtitle_position,
             fps=fps,
+            all_cues=all_cues,
+            sfx_config=sfx_config,
         )
         created_videos.append((output_path, index, total_parts))
         logger.info(f"Created Short part {index}/{total_parts}: {output_path}")

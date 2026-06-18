@@ -21,3 +21,13 @@ shorts:
 thumbnail:
   width: 1080
   height: 1920
+
+sound_effects:
+  enabled: true
+  confidence_threshold: 0.8
+  sfx:
+    profanity: assets/sfx/bleep.wav
+    shocking: assets/sfx/gasp.wav
+    funny: assets/sfx/rimshot.wav
+    sad: assets/sfx/sad_sting.wav
+    suspense: assets/sfx/riser.wav

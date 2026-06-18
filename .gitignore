@@ -191,3 +191,7 @@ cython_debug/
 assets/thumbnails/*.jpg
 assets/thumbnails/*.png
 !assets/thumbnails/example_thumbnail_generated.png
+
+# SFX files are added locally by the developer (download from YouTube Audio Library)
+assets/sfx/*.wav
+assets/sfx/*.mp3
