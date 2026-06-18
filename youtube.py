@@ -2,19 +2,43 @@ import os
 
 import praw
 from dotenv import load_dotenv
+from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-from config import load_config
+from config import DEBUG, load_config
 from logger import logger
 
-DEBUG = False
+REFRESH_TOKEN_HELP = (
+    "Your YouTube refresh token is invalid or expired. "
+    "Regenerate it with: python3 get_youtube_refresh_token.py\n"
+    "Then update YT_REFRESH_TOKEN in .env (and GitHub secrets if you use CI)."
+)
+
+
+def _missing_youtube_env_vars() -> list[str]:
+    return [
+        name
+        for name, value in (
+            ("YT_CLIENT_ID", os.getenv("YT_CLIENT_ID")),
+            ("YT_CLIENT_SECRET", os.getenv("YT_CLIENT_SECRET")),
+            ("YT_REFRESH_TOKEN", os.getenv("YT_REFRESH_TOKEN")),
+        )
+        if not value
+    ]
 
 
 def get_credentials(scopes: list[str]) -> Credentials:
-    """Retrieves YouTube API credientials"""
-    creds = Credentials(
+    """Retrieves YouTube API credentials."""
+    missing = _missing_youtube_env_vars()
+    if missing:
+        raise ValueError(
+            f"Missing YouTube credentials in .env: {', '.join(missing)}. "
+            "Run python3 get_youtube_refresh_token.py to generate a refresh token."
+        )
+
+    return Credentials(
         None,
         refresh_token=os.getenv("YT_REFRESH_TOKEN"),
         token_uri="https://oauth2.googleapis.com/token",
@@ -22,8 +46,6 @@ def get_credentials(scopes: list[str]) -> Credentials:
         client_secret=os.getenv("YT_CLIENT_SECRET"),
         scopes=scopes,
     )
-
-    return creds
 
 
 def upload_video(
@@ -35,7 +57,7 @@ def upload_video(
     """
     Uploads a video to YouTube using info from a PRAW submission object and a YAML config for static/auth settings.
     """
-    load_dotenv()
+    load_dotenv(override=True)
 
     config = load_config()
     category_id = config.get("category_id")
@@ -93,17 +115,21 @@ def upload_video(
     if part and total_parts and total_parts > 1:
         upload_label = f"{submission.title} (Part {part}/{total_parts})"
     logger.info(f"Uploading video: {upload_label}")
-    response = None
-    while response is None:
-        status, response = request.next_chunk()
-        if status:
-            logger.info(f"Uploaded {int(status.progress() * 100)}%...")
-    logger.info("Upload complete!")
-    logger.info(f"Video ID: {response['id']}")
+    try:
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+            if status:
+                logger.info(f"Uploaded {int(status.progress() * 100)}%...")
+        logger.info("Upload complete!")
+        logger.info(f"Video ID: {response['id']}")
 
-    thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
-    if os.path.exists(thumbnail_path):
-        youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()
-        logger.info(f"Thumbnail uploaded from {thumbnail_path}")
-    else:
-        logger.info(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")
+        thumbnail_path = f"assets/thumbnails/{submission.id}.jpg"
+        if os.path.exists(thumbnail_path):
+            youtube.thumbnails().set(videoId=response["id"], media_body=MediaFileUpload(thumbnail_path)).execute()
+            logger.info(f"Thumbnail uploaded from {thumbnail_path}")
+        else:
+            logger.info(f"Thumbnail not found at {thumbnail_path}, skipping thumbnail upload.")
+    except RefreshError as exc:
+        logger.error(REFRESH_TOKEN_HELP)
+        raise RefreshError(f"{exc}. {REFRESH_TOKEN_HELP}") from exc

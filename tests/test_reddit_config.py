@@ -1,15 +1,24 @@
 import unittest
+from unittest.mock import patch
 
+import config
 from config import load_reddit_config
 from reddit_sources import parse_subreddit_sources
 
 
 class TestRedditConfig(unittest.TestCase):
-    def test_loads_configured_subreddits(self) -> None:
+    def test_loads_production_subreddits(self) -> None:
         sources = parse_subreddit_sources(load_reddit_config())
         names = [source.name for source in sources]
 
         self.assertEqual(names, ["AITAH", "AmIOverreacting"])
+
+    def test_loads_development_subreddits(self) -> None:
+        with patch.object(config, "DEBUG", True):
+            sources = parse_subreddit_sources(load_reddit_config())
+            names = [source.name for source in sources]
+
+        self.assertEqual(names, ["fuckubisoft"])
 
     def test_applies_defaults(self) -> None:
         config = {
