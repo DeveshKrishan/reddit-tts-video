@@ -58,8 +58,6 @@ Automatically overlay contextual sound effects onto the generated video based on
 | **Shocking / OMG** | Keywords: `unbelievable`, `no way`, `insane`, `wtf`, `shocked`, `omg`, `horrified` | Dramatic sting / gasp SFX |
 | **Funny / Comedic** | Keywords: `lmao`, `lol`, `hilarious`, `rofl`, `dying`, `💀`, `😂` | Rimshot, laugh track, or cartoon boing |
 | **Sad / Emotional** | Keywords: `died`, `passed away`, `heartbroken`, `crying`, `tragic` | Sad violin sting |
-| **Wholesome / Uplifting** | Keywords: `wholesome`, `sweet`, `saved`, `hero`, `amazing`, `heartwarming` | Warm chime or "aww" crowd |
-| **Plot twist** | Keywords: `turns out`, `but wait`, `actually`, `little did I know` | Dramatic reversal sting |
 | **Tension / Suspense** | Keywords: `then it happened`, `what happened next`, `suddenly` | Low drone / suspense riser |
 
 ### Implementation Plan
@@ -79,8 +77,6 @@ Automatically overlay contextual sound effects onto the generated video based on
     shocking: assets/sfx/gasp.wav
     funny: assets/sfx/rimshot.wav
     sad: assets/sfx/sad_sting.wav
-    wholesome: assets/sfx/chime.wav
-    plot_twist: assets/sfx/sting.wav
     suspense: assets/sfx/riser.wav
   ```
 
