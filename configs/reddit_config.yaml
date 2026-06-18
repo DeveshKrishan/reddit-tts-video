@@ -18,3 +18,5 @@ production:
       limit: 1
     - name: AmIOverreacting
       limit: 1
+    - name: EntitledPeople
+      limit: 1
