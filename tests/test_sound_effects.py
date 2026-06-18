@@ -3,6 +3,13 @@ from unittest.mock import patch
 
 from sound_effects import SoundCue, detect_sound_cues
 
+TEST_KEYWORDS: dict[str, list[str]] = {
+    "shocking": ["unbelievable", "insane", "omg", "shocked"],
+    "funny": ["lmao", "hilarious", "lol"],
+    "sad": ["heartbroken", "died", "crying"],
+    "suspense": ["suddenly", "then it happened"],
+}
+
 
 def _make_segments(words: list[tuple[str, float, float]]) -> list[dict]:
     """Build minimal Whisper-style segments with word timestamps."""
@@ -22,12 +29,13 @@ def _make_segments(words: list[tuple[str, float, float]]) -> list[dict]:
 class TestDetectSoundCues(unittest.TestCase):
     def _detect(self, raw_text: str, words: list[tuple[str, float, float]], **kwargs) -> list[SoundCue]:
         segments = _make_segments(words)
+        kwargs.setdefault("keyword_categories", TEST_KEYWORDS)
         with patch("sound_effects._load_profanity_list", return_value={"damn", "shit", "fuck"}):
             return detect_sound_cues(raw_text, segments, **kwargs)
 
     def test_empty_segments_returns_no_cues(self) -> None:
         with patch("sound_effects._load_profanity_list", return_value={"damn"}):
-            cues = detect_sound_cues("damn", [], confidence_threshold=0.8)
+            cues = detect_sound_cues("damn", [], TEST_KEYWORDS, confidence_threshold=0.8)
         self.assertEqual(cues, [])
 
     def test_profanity_word_produces_bleep_cue(self) -> None:

@@ -136,7 +136,8 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     sfx_enabled = sfx_section.get("enabled", False)
     sfx_confidence = sfx_section.get("confidence_threshold", 0.8)
     sfx_config = sfx_section.get("sfx", {}) if sfx_enabled else None
-    all_cues = detect_sound_cues(submission.selftext, segments, sfx_confidence) if sfx_enabled else None
+    sfx_keywords: dict[str, list[str]] = sfx_section.get("keywords", {})
+    all_cues = detect_sound_cues(submission.selftext, segments, sfx_keywords, sfx_confidence) if sfx_enabled else None
     if all_cues:
         logger.info(f"Detected {len(all_cues)} sound cue(s) for submission {submission.id}.")
 

@@ -31,3 +31,40 @@ sound_effects:
     funny: assets/sfx/rimshot.wav
     sad: assets/sfx/sad_sting.wav
     suspense: assets/sfx/riser.wav
+  keywords:
+    shocking:
+      - unbelievable
+      - no way
+      - insane
+      - wtf
+      - shocked
+      - omg
+      - horrified
+      - cannot believe
+      - mind blown
+      - jaw drop
+    funny:
+      - lmao
+      - lol
+      - hilarious
+      - rofl
+      - im dead
+      - "i'm dead"
+      - dying
+      - hahahaha
+    sad:
+      - died
+      - passed away
+      - heartbroken
+      - crying
+      - tragic
+      - devastating
+      - grief
+      - mourning
+    suspense:
+      - then it happened
+      - what happened next
+      - suddenly
+      - out of nowhere
+      - without warning
+      - to my horror

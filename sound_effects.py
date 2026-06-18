@@ -20,49 +20,6 @@ from logger import logger
 
 PROFANITY_LIST_PATH = Path("assets/profanity_list.txt")
 
-KEYWORD_CATEGORIES: dict[str, list[str]] = {
-    "shocking": [
-        "unbelievable",
-        "no way",
-        "insane",
-        "wtf",
-        "shocked",
-        "omg",
-        "horrified",
-        "cannot believe",
-        "mind blown",
-        "jaw drop",
-    ],
-    "funny": [
-        "lmao",
-        "lol",
-        "hilarious",
-        "rofl",
-        "im dead",
-        "i'm dead",
-        "dying",
-        "hahahaha",
-    ],
-    "sad": [
-        "died",
-        "passed away",
-        "heartbroken",
-        "crying",
-        "tragic",
-        "devastating",
-        "grief",
-        "mourning",
-    ],
-    "suspense": [
-        "then it happened",
-        "what happened next",
-        "suddenly",
-        "out of nowhere",
-        "without warning",
-        "to my horror",
-    ],
-}
-
 
 @dataclass
 class SoundCue:
@@ -109,6 +66,7 @@ def _find_word_timestamp(word: str, flat_words: list[dict]) -> dict | None:
 def detect_sound_cues(
     raw_text: str,
     segments: list[dict],
+    keyword_categories: dict[str, list[str]],
     confidence_threshold: float = 0.8,
 ) -> list[SoundCue]:
     """Detect sound cue trigger points from raw Reddit text and Whisper segments.
@@ -120,6 +78,8 @@ def detect_sound_cues(
     Args:
         raw_text: The original Reddit post body text.
         segments: Whisper result["segments"] list (must have word_timestamps=True).
+        keyword_categories: Mapping of effect name → trigger keyword list, loaded
+            from the ``sound_effects.keywords`` section of youtube_config.yaml.
         confidence_threshold: Minimum match confidence; exact keyword matches
             score 1.0, fuzzy matches below this value are discarded.
 
@@ -146,7 +106,7 @@ def detect_sound_cues(
             logger.debug(f"Profanity bleep cue at t={entry['start']:.2f}s: '{entry['word']}'")
 
     # --- Keyword categories (scan raw text, map to first matching Whisper word) ---
-    for category, keywords in KEYWORD_CATEGORIES.items():
+    for category, keywords in keyword_categories.items():
         triggered = False
         for keyword in keywords:
             if keyword not in text_lower:
