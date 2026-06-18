@@ -67,7 +67,7 @@ def _render_part(
         clip = base_clip.subclipped(0, duration)
 
     subtitles = [
-        ((float(segment["start"]) - part_start, float(segment["end"]) - part_start), segment["text"])
+        ((float(segment["start"]) - part_start, float(segment["end"]) - part_start), segment["text"].lower())
         for segment in part_segments
     ]
 
