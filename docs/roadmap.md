@@ -90,10 +90,11 @@ Automatically overlay contextual sound effects onto the generated video based on
 - Allow per-category overrides (e.g. disable bleeps but keep funny SFX)
 - Expose settings in `reddit_config.yaml` under a `sound_effects:` section
 
-### Open Questions
-- Should bleep detection run on the raw Reddit text (before TTS) or on the Whisper transcript (after)?  Using the raw text is more reliable since Whisper sometimes mishears profanity.
-- Do we need a confidence threshold for sentiment keywords to avoid false positives?
-- What royalty-free SFX libraries should we use? (e.g. Freesound.org, ZapSplat, YouTube Audio Library)
+### Decisions
+
+- **Bleep detection source:** Run on the raw Reddit text (before TTS). Whisper sometimes mishears or omits profanity, so scanning the source text before synthesis gives more reliable detection. The word's timestamp is still sourced from Whisper for precise audio ducking.
+- **Confidence threshold:** Yes — keyword matches will require a minimum confidence score to reduce false positives. Exact keywords score 1.0; fuzzy/partial matches will be filtered at a configurable threshold (default `0.8`) stored in `sfx_config.yaml`.
+- **SFX source:** Use the [YouTube Audio Library](https://studio.youtube.com/channel/UCxxxx/music) meme/sound-effects section. It is royalty-free, already cleared for YouTube uploads, and contains popular meme stings (vine boom, bruh, wrong answer, etc.) that fit the Reddit TTS genre well.
 
 ---
 
