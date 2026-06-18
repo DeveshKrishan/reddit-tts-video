@@ -4,13 +4,12 @@ import yaml
 
 CONFIG_PATH = Path("youtube_config.yaml")
 REDDIT_CONFIG_PATH = Path("reddit_config.yaml")
-REDDIT_TEST_CONFIG_PATH = Path("reddit_config.test.yaml")
 
 DEBUG = False
 
 
-def _reddit_config_path() -> Path:
-    return REDDIT_TEST_CONFIG_PATH if DEBUG else REDDIT_CONFIG_PATH
+def _reddit_environment() -> str:
+    return "development" if DEBUG else "production"
 
 
 def load_config() -> dict:
@@ -20,6 +19,12 @@ def load_config() -> dict:
 
 
 def load_reddit_config() -> dict:
-    """Load subreddit sources from reddit_config.yaml (test config when DEBUG is on)."""
-    with _reddit_config_path().open("r") as f:
-        return yaml.safe_load(f) or {}
+    """Load subreddit sources for the active environment from reddit_config.yaml."""
+    with REDDIT_CONFIG_PATH.open("r") as f:
+        config = yaml.safe_load(f) or {}
+
+    environment = _reddit_environment()
+    if environment not in config:
+        raise ValueError(f"Missing {environment!r} section in {REDDIT_CONFIG_PATH}")
+
+    return config[environment]

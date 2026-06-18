@@ -1,7 +1,0 @@
-defaults:
-  time_filter: day
-  limit: 1
-  enabled: true
-
-subreddits:
-  - name: test
