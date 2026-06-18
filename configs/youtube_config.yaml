@@ -21,3 +21,12 @@ shorts:
 thumbnail:
   width: 1080
   height: 1920
+
+# Text-to-speech settings (Microsoft Edge neural voices — free, no API key needed).
+# Voice options: en-US-GuyNeural, en-US-ChristopherNeural, en-US-AriaNeural, en-US-JennyNeural
+# rate:  CSS Speech relative value — "+10%" = 10% faster, "-5%" = 5% slower, "+0%" = default
+# pitch: Hz offset — "+0Hz" = default, "+5Hz" = slightly higher
+tts:
+  voice: en-US-GuyNeural
+  rate: "+10%"
+  pitch: "+0Hz"
