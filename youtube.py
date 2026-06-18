@@ -79,9 +79,10 @@ def upload_video(
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    # Build a safe, short description using only title, author, and subreddit (no link)
+    post_url = f"https://www.reddit.com{submission.permalink}"
     description = (
-        f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n\n"
+        f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n"
+        f"Original post: {post_url}\n\n"
         "If you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\n"
         "Share with your friends and let us know your thoughts below."
     )
