@@ -1,6 +1,17 @@
 enabled: true
 confidence_threshold: 0.8
 
+# Intro stinger played at t=0 of part 1 to hook the viewer before narration.
+# One file is picked at random per video so the opening never sounds identical.
+# Only "first_only" is supported for parts; "all" can be added later.
+intro:
+  enabled: true
+  files:
+    - assets/sfx/Reverberating Slam.mp3
+    - assets/sfx/Crash Metal Sweetener Distant.mp3
+  volume: 0.6
+  parts: first_only
+
 # Paths to royalty-free SFX files (download from YouTube Audio Library).
 # Files are gitignored — add them locally under assets/sfx/.
 # See assets/sfx/README.md for the full list of required filenames.

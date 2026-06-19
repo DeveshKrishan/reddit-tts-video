@@ -74,32 +74,42 @@ shorts:
 
 ### 3.2 Intro Sound Effect (Proposal — Medium Impact)
 
-**Problem:** The audio currently opens cold on the narration. A short, recognizable intro sound (a "whoosh", notification ping, or subtle riser) under the title card adds an audio hook that signals *"a story is starting"* and pairs with the visual in 3.1. It also doubles as a soft branding cue if reused across every video.
+**Problem:** The audio currently opens cold on the narration. A short, punchy intro sound under the title card adds an audio hook that signals *"a story is starting"* and pairs with the visual in 3.1.
 
-**Proposed design:** Reuse the existing SFX engine rather than building anything new. The pipeline already mixes timestamped `SoundCue`s into the TTS track via `mix_sound_effects` (`sound_effects.py`). We add an always-on "intro" cue at `t=0` for part 1.
+**Proposed design:** Reuse the existing SFX engine rather than building anything new. The pipeline already mixes timestamped `SoundCue`s into the TTS track via `mix_sound_effects` (`sound_effects.py`). We add an always-on intro cue at `t=0` for part 1 (not a keyword trigger — it always fires), gated by config.
 
-- Add an `intro` entry to `configs/sfx_config.yaml` → `sfx:` pointing at a file in `assets/sfx/` (e.g. `intro_whoosh.wav`).
-- Inject a single `SoundCue(effect="intro", start_time=0.0, ...)` at the start of part 1 (not a keyword trigger — it always fires), gated by config.
-- Ideally overlap/time it with the title-card window (3.1) so audio and visual hooks land together.
+**Sound assets (YouTube Audio Library):** Two intro stingers are already in `assets/sfx/`:
+
+| File | Character |
+|------|-----------|
+| `Reverberating Slam.mp3` | Heavy, dramatic impact — good for conflict/drama posts |
+| `Crash Metal Sweetener Distant.mp3` | Metallic crash with distance — slightly lighter, still attention-grabbing |
+
+**Randomization:** Pick one file at random per video (part 1 only). This keeps the opening from feeling identical across every upload while still landing a strong hook. Over time, retention data in YouTube Studio can show whether one sound outperforms the other.
+
+- `random.choice(intro_files)` at render time in `videoeditor.py` (or a small helper in `sound_effects.py`).
+- Same volume for both so the mix is consistent regardless of which clip plays.
+- Ideally timed with the title-card window (3.1) so audio and visual hooks land together.
 
 ```yaml
 # configs/sfx_config.yaml
 intro:
   enabled: true
-  file: assets/sfx/intro_whoosh.wav
+  files:
+    - assets/sfx/Reverberating Slam.mp3
+    - assets/sfx/Crash Metal Sweetener Distant.mp3
   volume: 0.6        # keep it under the narration so it doesn't startle
   parts: first_only  # first_only | all
 ```
 
 **Touch points:**
-- `configs/sfx_config.yaml` — `intro` section + `sfx.intro` path.
-- `sound_effects.py` / `videoeditor.py` — build the intro cue for part 1 and pass it into the existing mix step.
-- `assets/sfx/README.md` — document the new required filename (SFX files are gitignored).
+- `configs/sfx_config.yaml` — `intro` section with `files` list (not a single path).
+- `sound_effects.py` / `videoeditor.py` — random pick from `intro.files`, build `SoundCue(effect="intro", start_time=0.0, ...)`, pass into existing mix step.
+- `assets/sfx/README.md` — document the two intro filenames.
 
 **Open questions:**
-- One fixed intro sound (branding) vs. rotate a few for variety?
-- Volume level — loud enough to register, quiet enough not to clip the first narrated word?
-- First part only, or every part?
+- Volume level — loud enough to register, quiet enough not to clip the first narrated word? Start at `0.6` and tune after local preview.
+- First part only, or every part? Default `first_only`.
 
 ---
 
