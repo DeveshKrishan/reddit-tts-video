@@ -2,7 +2,7 @@
 
 **Status:** Draft / Proposal
 **Author:** _TBD_
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-19
 
 ---
 
@@ -27,12 +27,12 @@ Shorts data consistently shows ~60–70% of viewers who leave do so in the **fir
 |--------|----------------|---------------|
 | Post selection quality | `configs/reddit_config.yaml`, `fetch_content.py`, `reddit_sources.py` | Uses Reddit `top` ranking (upvote-validated) — considered solved |
 | Opening hook (title card) | `videoeditor.py` | Not implemented — starts straight into narration |
-| Subtitle readability | `highlighted_subtitles.py`, `youtube_config.yaml` | Padding + green highlight + pop animation |
+| Subtitle readability | `highlighted_subtitles.py`, `youtube_config.yaml` | TikTok-style: 4 words on screen, 72px neon green highlight + pop animation |
 | TTS voice/speed | `youtube_config.yaml` → `tts.py` | `en-US-GuyNeural`, +10% speed |
 | Tags/discoverability | `youtube.py`, `youtube_config.yaml` | Tiered tag system in place |
 | Video title | `youtube.py` | Post title + subreddit hashtag |
 | Background footage | `videoeditor.py` | Single hardcoded `assets/video/input2.mp4` |
-| Sound effects | `sound_effects.py`, `configs/sfx_config.yaml` | Keyword/profanity-triggered SFX mixed into TTS; no intro sound |
+| Sound effects | `sound_effects.py`, `configs/sfx_config.yaml` | Keyword/profanity-triggered SFX; Emergency Radio Alert intro + background music |
 
 ---
 
@@ -41,6 +41,29 @@ Shorts data consistently shows ~60–70% of viewers who leave do so in the **fir
 Two changes are proposed for the first iteration, plus a set of follow-ups.
 
 > **Note on content quality:** We deliberately do *not* add an upvote/length filter. Reddit's `top` ranking already surfaces community-validated, high-upvote posts, so an extra score filter would be redundant. Content selection is considered solved by the existing `top(time_filter=...)` fetch.
+
+### 3.0 TikTok-Style Subtitle Chunking (Implemented — High Impact)
+
+**Problem:** Full Whisper segments (5–15 words) appeared on screen at once. Viewers had to read ahead while listening, which increases cognitive load and swipe-away rate in the first few seconds.
+
+**Implemented design:** Rechunk all aligned words into groups of 4 (configurable). Only one group is visible at a time; the currently spoken word is highlighted in neon green (`#39FF14`) with a pop animation. Font size increased from 42px → 72px so words are readable at a glance on mobile.
+
+```yaml
+shorts:
+  subtitle_font_size: 72
+  subtitle_max_words_per_group: 4   # 3–5 recommended for Shorts retention
+  subtitle_horizontal_padding: 120
+  subtitle_bottom_margin: 320
+```
+
+**Touch points:**
+- `highlighted_subtitles.py` — `_rechunk_words()`, `create_highlighted_subtitles_clip(max_words_per_group=...)`
+- `configs/youtube_config.yaml` — knobs above
+- `tests/test_highlighted_subtitles.py` — unit tests for chunking and rendering
+
+**Why it works:** Short-form platforms (TikTok, Reels) train viewers to expect small caption bursts. Showing 3–4 words at a time keeps eyes on the screen and reduces the "wall of text" effect that triggers swipes.
+
+---
 
 ### 3.1 Title Card Hook Overlay (Proposal — High Impact)
 
@@ -72,44 +95,36 @@ shorts:
 
 ---
 
-### 3.2 Intro Sound Effect (Proposal — Medium Impact)
+### 3.2 Intro Sound Effect (Implemented — Medium Impact)
 
-**Problem:** The audio currently opens cold on the narration. A short, punchy intro sound under the title card adds an audio hook that signals *"a story is starting"* and pairs with the visual in 3.1.
+**Problem:** The audio previously opened cold on the narration. A short, punchy intro sound signals *"a story is starting"* and pairs with the visual hook.
 
-**Proposed design:** Reuse the existing SFX engine rather than building anything new. The pipeline already mixes timestamped `SoundCue`s into the TTS track via `mix_sound_effects` (`sound_effects.py`). We add an always-on intro cue at `t=0` for part 1 (not a keyword trigger — it always fires), gated by config.
+**Implemented design:** Reuse the existing SFX engine. An always-on intro cue at `t=0` for part 1 fires via `build_intro_cues()` in `sound_effects.py`.
 
-**Sound assets (YouTube Audio Library):** Two intro stingers are already in `assets/sfx/`:
+**Sound asset (YouTube Audio Library):**
 
 | File | Character |
 |------|-----------|
-| `Reverberating Slam.mp3` | Heavy, dramatic impact — good for conflict/drama posts |
-| `Crash Metal Sweetener Distant.mp3` | Metallic crash with distance — slightly lighter, still attention-grabbing |
-
-**Randomization:** Pick one file at random per video (part 1 only). This keeps the opening from feeling identical across every upload while still landing a strong hook. Over time, retention data in YouTube Studio can show whether one sound outperforms the other.
-
-- `random.choice(intro_files)` at render time in `videoeditor.py` (or a small helper in `sound_effects.py`).
-- Same volume for both so the mix is consistent regardless of which clip plays.
-- Ideally timed with the title-card window (3.1) so audio and visual hooks land together.
+| `Emergency Radio Alert.mp3` | Urgent EAS-style alert — strong attention grab at t=0 |
 
 ```yaml
 # configs/sfx_config.yaml
 intro:
   enabled: true
   files:
-    - assets/sfx/Reverberating Slam.mp3
-    - assets/sfx/Crash Metal Sweetener Distant.mp3
-  volume: 0.6        # keep it under the narration so it doesn't startle
-  parts: first_only  # first_only | all
+    - assets/sfx/Emergency Radio Alert.mp3
+  volume: 1.0
+  parts: first_only
 ```
 
 **Touch points:**
-- `configs/sfx_config.yaml` — `intro` section with `files` list (not a single path).
-- `sound_effects.py` / `videoeditor.py` — random pick from `intro.files`, build `SoundCue(effect="intro", start_time=0.0, ...)`, pass into existing mix step.
-- `assets/sfx/README.md` — document the two intro filenames.
+- `configs/sfx_config.yaml` — `intro` section
+- `sound_effects.py` / `videoeditor.py` — `build_intro_cues()`, mixed via existing `mix_sound_effects` step
+- `assets/sfx/README.md` — documents the intro filename
 
 **Open questions:**
-- Volume level — loud enough to register, quiet enough not to clip the first narrated word? Start at `0.6` and tune after local preview.
-- First part only, or every part? Default `first_only`.
+- Volume level — tune after local preview if the alert clips the first narrated word.
+- First part only, or every part? Currently `first_only`.
 
 ---
 
@@ -137,9 +152,9 @@ Read the retention graph per video: a sharp drop at 0–3s means the hook needs 
 
 ## 6. Rollout Plan
 
-1. Land this design doc; agree on defaults and open questions.
-2. Implement 3.1 (title card) behind `title_card_enabled`.
-3. Implement 3.2 (intro sound) behind `intro.enabled`, ideally timed with the title card.
+1. ~~Land subtitle chunking (3.0)~~ — shipped on `feat/bigger-subtitles`.
+2. ~~Land intro sound (3.2)~~ — shipped on `feat/cursor-skills`.
+3. Land title card (3.1) behind `title_card_enabled`.
 4. Run with `DEBUG=True` locally; review output videos manually.
 5. Enable in production config; monitor retention for 1–2 weeks vs. baseline.
 6. Decide on follow-ups based on metrics.

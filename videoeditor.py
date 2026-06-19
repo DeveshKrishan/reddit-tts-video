@@ -93,6 +93,7 @@ def _render_part(
     subtitle_position: str,
     subtitle_bottom_margin: int,
     subtitle_horizontal_padding: int,
+    subtitle_max_words_per_group: int,
     fps: int,
     all_cues: list[SoundCue] | None = None,
     sfx_config: dict | None = None,
@@ -123,6 +124,7 @@ def _render_part(
         video_width=clip.w,
         font_size=subtitle_font_size,
         horizontal_padding=subtitle_horizontal_padding,
+        max_words_per_group=subtitle_max_words_per_group,
     )
     clip = clip.with_audio(part_audio)
     pos = _subtitle_position(clip, max_subtitle_h, subtitle_position, subtitle_bottom_margin)
@@ -141,10 +143,11 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     fps = shorts.get("fps", 30)
     max_duration = shorts.get("max_duration_seconds", 180)
     crop_mode = shorts.get("crop_mode", "center")
-    subtitle_font_size = shorts.get("subtitle_font_size", 42)
+    subtitle_font_size = shorts.get("subtitle_font_size", 72)
     subtitle_position = shorts.get("subtitle_position", "lower_third")
     subtitle_bottom_margin = shorts.get("subtitle_bottom_margin", 320)
-    subtitle_horizontal_padding = shorts.get("subtitle_horizontal_padding", 160)
+    subtitle_horizontal_padding = shorts.get("subtitle_horizontal_padding", 120)
+    subtitle_max_words_per_group = shorts.get("subtitle_max_words_per_group", 4)
 
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
@@ -243,6 +246,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             subtitle_position=subtitle_position,
             subtitle_bottom_margin=subtitle_bottom_margin,
             subtitle_horizontal_padding=subtitle_horizontal_padding,
+            subtitle_max_words_per_group=subtitle_max_words_per_group,
             fps=fps,
             all_cues=part_cues or None,
             sfx_config=sfx_config,
