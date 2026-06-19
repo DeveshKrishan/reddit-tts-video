@@ -14,14 +14,18 @@ shorts:
   max_duration_seconds: 180
   long_content_strategy: split  # split | trim
   crop_mode: center  # center-crop landscape footage to 9:16
-  subtitle_font_size: 42
+  subtitle_font_size: 72
   subtitle_position: lower_third  # center | lower_third
   # Distance in pixels from the bottom of the frame to the bottom of the subtitle block.
   # Keeps subtitles clear of YouTube Shorts UI buttons (~25% from bottom = ~480px on 1920px).
   subtitle_bottom_margin: 320
   # Total horizontal padding in pixels (split evenly left + right).
   # Prevents subtitles from reaching the screen edge on phones.
-  subtitle_horizontal_padding: 160
+  subtitle_horizontal_padding: 120
+  # Max words shown on screen at once (TikTok-style caption chunking).
+  # Whisper segments are rechunked into groups of this size so the viewer
+  # always sees a small, easy-to-follow burst of words.
+  subtitle_max_words_per_group: 4
   add_hashtag: true               # append #Shorts to the upload description
   add_subreddit_hashtag: true     # append #SubredditName to the video title
 

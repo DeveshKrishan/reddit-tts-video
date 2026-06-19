@@ -1,6 +1,11 @@
-import numpy as np
-from moviepy import VideoClip
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PIL import Image, ImageDraw, ImageFont
+
+if TYPE_CHECKING:
+    from moviepy import VideoClip
 
 FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
 HIGHLIGHT_COLOR = "#39FF14"
@@ -187,60 +192,93 @@ def render_highlighted_text(
     return image, highlighted_word_bbox
 
 
+def _rechunk_words(
+    segment_words_list: list[tuple[dict, list[dict]]],
+    max_words_per_group: int,
+) -> list[list[dict]]:
+    """Flatten all Whisper word dicts and rechunk into fixed-size groups.
+
+    Each group is shown on screen simultaneously, replacing the full-segment
+    display. Smaller groups (3–4 words) create the TikTok-style caption effect
+    that keeps viewers engaged.
+    """
+    flat = [w for _, words in segment_words_list for w in words]
+    groups: list[list[dict]] = []
+    for i in range(0, len(flat), max_words_per_group):
+        chunk = flat[i : i + max_words_per_group]
+        if chunk:
+            groups.append(chunk)
+    return groups
+
+
 def create_highlighted_subtitles_clip(
     part_segments: list[dict],
     part_start: float,
     duration: float,
     video_width: int,
     font_size: int,
-    horizontal_padding: int = 160,
+    horizontal_padding: int = 120,
+    max_words_per_group: int = 4,
 ) -> tuple[VideoClip, int]:
-    """Build a subtitle clip that highlights the active spoken word in light green,
-    with a pop (scale-in) animation on each newly highlighted word."""
+    """Build a subtitle clip that highlights the active spoken word in neon green,
+    with a pop (scale-in) animation on each newly highlighted word.
+
+    Words are rechunked into groups of `max_words_per_group` (default 4) so
+    only a small burst of words is visible at once — the TikTok-style caption
+    format proven to maximise view-to-swipe ratio on short-form video.
+    """
+    import numpy as np
+    from moviepy import VideoClip
+
     max_text_width = video_width - horizontal_padding
     segment_words_list = [(segment, segment_words(segment)) for segment in part_segments]
 
-    # Cache: (segment_index, highlight_index | None) → (image, highlighted_word_bbox)
+    # Rechunk words into fixed-size groups for TikTok-style display.
+    word_groups: list[list[dict]] = _rechunk_words(segment_words_list, max_words_per_group)
+
+    # Cache: (group_index, highlight_index | None) → (image, highlighted_word_bbox)
     render_cache: dict[tuple[int, int | None], tuple[Image.Image, tuple[int, int, int, int] | None]] = {}
-    for segment_index, (_, words) in enumerate(segment_words_list):
-        word_text = [word_info["word"] for word_info in words]
-        render_cache[(segment_index, None)] = render_highlighted_text(word_text, None, font_size, max_text_width)
-        for highlight_index in range(len(words)):
-            render_cache[(segment_index, highlight_index)] = render_highlighted_text(
+    for group_index, group in enumerate(word_groups):
+        word_text = [w["word"] for w in group]
+        render_cache[(group_index, None)] = render_highlighted_text(word_text, None, font_size, max_text_width)
+        for highlight_index in range(len(group)):
+            render_cache[(group_index, highlight_index)] = render_highlighted_text(
                 word_text, highlight_index, font_size, max_text_width
             )
 
-    # Word timing lookup: (segment_index, word_index) → (start, end) relative to part_start
+    # Word timing lookup: (group_index, word_index) → (start, end) relative to part_start
     word_timings: dict[tuple[int, int], tuple[float, float]] = {}
-    for segment_index, (_, words) in enumerate(segment_words_list):
-        for word_index, word_info in enumerate(words):
-            word_timings[(segment_index, word_index)] = (
+    for group_index, group in enumerate(word_groups):
+        for word_index, word_info in enumerate(group):
+            word_timings[(group_index, word_index)] = (
                 float(word_info["start"]) - part_start,
                 float(word_info["end"]) - part_start,
             )
 
     def active_state(t: float) -> tuple[int, int | None] | None:
-        for segment_index, (segment, words) in enumerate(segment_words_list):
-            start = float(segment["start"]) - part_start
-            end = float(segment["end"]) - part_start
-            if start <= t < end:
+        for group_index, group in enumerate(word_groups):
+            if not group:
+                continue
+            group_start = float(group[0]["start"]) - part_start
+            group_end = float(group[-1]["end"]) - part_start
+            if group_start <= t < group_end:
                 highlight_index = None
-                for index, word_info in enumerate(words):
+                for word_index, word_info in enumerate(group):
                     word_start = float(word_info["start"]) - part_start
                     word_end = float(word_info["end"]) - part_start
                     if word_start <= t < word_end:
-                        highlight_index = index
+                        highlight_index = word_index
                         break
-                return segment_index, highlight_index
+                return group_index, highlight_index
         return None
 
     def _animated_image(state: tuple[int, int | None], t: float) -> Image.Image:
         """Return the subtitle image with the pop animation applied for time t."""
         image, word_bbox = render_cache[state]
-        segment_index, highlight_index = state
+        group_index, highlight_index = state
 
         if highlight_index is not None and word_bbox is not None:
-            timing = word_timings.get((segment_index, highlight_index))
+            timing = word_timings.get((group_index, highlight_index))
             if timing:
                 word_start, word_end = timing
                 word_dur = word_end - word_start
