@@ -1,4 +1,5 @@
 import os
+import re
 
 import praw
 from dotenv import load_dotenv
@@ -9,6 +10,158 @@ from googleapiclient.http import MediaFileUpload
 
 from config import DEBUG, load_config
 from logger import logger
+
+# Keyword → YouTube search tags mapping.
+# Keys are words to detect in the post title (lowercase); values are tags to emit.
+_KEYWORD_TAG_MAP: dict[str, list[str]] = {
+    # Relationships
+    "husband": ["husbandwife", "marriagedrama", "relationship"],
+    "wife": ["husbandwife", "marriagedrama", "relationship"],
+    "boyfriend": ["relationship", "relationshipadvice", "boyfriendgirlfriend"],
+    "girlfriend": ["relationship", "relationshipadvice", "boyfriendgirlfriend"],
+    "fiancé": ["engaged", "relationship", "wedding"],
+    "fiance": ["engaged", "relationship", "wedding"],
+    "ex": ["exdrama", "breakup", "relationship"],
+    "partner": ["relationship", "relationshipadvice"],
+    "marriage": ["marriagedrama", "relationship", "married"],
+    "divorce": ["divorce", "marriagedrama", "relationship"],
+    "sister": ["familydrama", "siblings"],
+    "brother": ["familydrama", "siblings"],
+    "mom": ["familydrama", "toxicfamily", "momstories"],
+    "mother": ["familydrama", "toxicfamily", "momstories"],
+    "dad": ["familydrama", "toxicfamily"],
+    "father": ["familydrama", "toxicfamily"],
+    "parents": ["familydrama", "toxicparents"],
+    "inlaw": ["inlaws", "familydrama", "motherinlaw"],
+    "inlaws": ["inlaws", "familydrama", "motherinlaw"],
+    "coworker": ["workplacedrama", "coworkers", "officedrama"],
+    "boss": ["workplacedrama", "toxicworkplace", "work"],
+    "friend": ["friendshipdrama", "toxic", "friendship"],
+    "neighbor": ["neighbordrama", "neighbors"],
+    "roommate": ["roommate", "roommatestories"],
+    # Conflicts / actions
+    "cheated": ["cheating", "infidelity", "betrayal"],
+    "cheat": ["cheating", "infidelity", "betrayal"],
+    "cheating": ["cheating", "infidelity", "betrayal"],
+    "lied": ["betrayal", "honesty", "trust"],
+    "lying": ["betrayal", "honesty"],
+    "stole": ["drama", "betrayal"],
+    "fired": ["workplacedrama", "fired", "work"],
+    "quit": ["workplacedrama", "quitmyjob"],
+    "pregnant": ["pregnancydrama", "family", "relationship"],
+    "baby": ["familydrama", "parenting"],
+    "wedding": ["weddingdrama", "wedding", "relationship"],
+    "money": ["moneydrama", "finances", "relationship"],
+    "inheritance": ["familydrama", "inheritance", "money"],
+    "entitled": ["entitledpeople", "karen", "entitledparents"],
+    "karen": ["karen", "entitledpeople"],
+    "toxic": ["toxicpeople", "toxicrelationship"],
+    "abuse": ["abuse", "toxicrelationship", "mentalhealth"],
+    "trauma": ["trauma", "mentalhealth"],
+    "secret": ["secrets", "betrayal", "drama"],
+    "revenge": ["revenge", "prorevenge", "satisfying"],
+    "blocked": ["drama", "relationship"],
+    "confronted": ["confrontation", "drama"],
+    "ghosted": ["ghosted", "dating", "relationship"],
+    # Outcomes
+    "update": ["redditupdate", "storytime"],
+    "apology": ["apology", "drama"],
+    "cut off": ["toxicfamily", "nocontact"],
+    "nocontact": ["nocontact", "toxicfamily"],
+}
+
+
+def _post_tags(title: str) -> list[str]:
+    """Derive high-searchability YouTube tags from the post title.
+
+    Scans the title for known relationship/conflict keywords and maps them to
+    popular YouTube search terms, then falls back to cleaned title words.
+    """
+    lower = title.lower()
+    seen: set[str] = set()
+    tags: list[str] = []
+
+    def _add(t: str) -> None:
+        key = t.lower()
+        if key not in seen:
+            seen.add(key)
+            tags.append(t)
+
+    # Keyword-mapped tags first (highest relevance)
+    for keyword, mapped in _KEYWORD_TAG_MAP.items():
+        if keyword in lower:
+            for t in mapped:
+                _add(t)
+            if len(tags) >= 8:
+                break
+
+    # Fill remaining slots with cleaned title words (≥5 chars, not already added)
+    stop = {
+        "about",
+        "after",
+        "again",
+        "against",
+        "always",
+        "because",
+        "before",
+        "could",
+        "every",
+        "going",
+        "should",
+        "their",
+        "there",
+        "these",
+        "think",
+        "those",
+        "though",
+        "until",
+        "wants",
+        "which",
+        "while",
+        "would",
+        "years",
+        "still",
+        "people",
+        "really",
+        "where",
+    }
+    for word in re.findall(r"[a-zA-Z]{5,}", title):
+        if word.lower() not in stop:
+            _add(word)
+        if len(tags) >= 10:
+            break
+
+    return tags
+
+
+def _build_tags(
+    submission: praw.models.Submission,
+    tags_config: dict,
+) -> list[str]:
+    """Combine broad + subreddit-specific + post-specific tags (deduped, max 500 chars total)."""
+    broad: list[str] = tags_config.get("broad", [])
+    subreddit_map: dict[str, list[str]] = tags_config.get("subreddit", {})
+    niche: list[str] = subreddit_map.get(str(submission.subreddit), [])
+    post: list[str] = _post_tags(submission.title)
+
+    seen: set[str] = set()
+    combined: list[str] = []
+    for tag in broad + niche + post:
+        key = tag.lower()
+        if key not in seen:
+            seen.add(key)
+            combined.append(tag)
+
+    # YouTube tag list must be ≤ 500 chars total (joined by commas)
+    result: list[str] = []
+    total = 0
+    for tag in combined:
+        if total + len(tag) + 1 > 500:
+            break
+        result.append(tag)
+        total += len(tag) + 1
+    return result
+
 
 REFRESH_TOKEN_HELP = (
     "Your YouTube refresh token is invalid or expired. "
@@ -63,6 +216,7 @@ def upload_video(
     category_id = config.get("category_id")
     privacy_status = config.get("privacy_status")
     shorts_config = config.get("shorts", {})
+    tags_config = config.get("tags", {})
 
     if not category_id or not privacy_status:
         raise ValueError("Category ID and Privacy Status must be set in configs/youtube_config.yaml")
@@ -88,7 +242,10 @@ def upload_video(
     )
     if part and total_parts and total_parts > 1:
         description = f"Part {part} of {total_parts}\n\n{description}"
-    if shorts_config.get("enabled") and shorts_config.get("add_hashtag", True):
+    tags = _build_tags(submission, tags_config)
+    if tags:
+        description += "\n\n" + " ".join(f"#{t}" for t in tags)
+    elif shorts_config.get("enabled") and shorts_config.get("add_hashtag", True):
         description += "\n\n#Shorts"
 
     safe_title = submission.title if submission.title else "Reddit Story"

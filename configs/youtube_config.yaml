@@ -25,6 +25,37 @@ shorts:
   add_hashtag: true               # append #Shorts to the upload description
   add_subreddit_hashtag: true     # append #SubredditName to the video title
 
+tags:
+  # Always added to every upload
+  broad:
+    - Shorts
+    - viral
+    - viralshorts
+    - foryou
+    - foryoupage
+    - fyp
+    - reddit
+    - redditstories
+    - storytime
+
+  # Extra tags added when uploading from a specific subreddit (key = exact subreddit name)
+  subreddit:
+    AITAH:
+      - AITAH
+      - AmITheAsshole
+      - redditAITAH
+      - relationships
+      - drama
+    AmIOverreacting:
+      - AmIOverreacting
+      - redditdrama
+      - relationships
+    EntitledPeople:
+      - EntitledPeople
+      - entitledparents
+      - entitledkaren
+      - karen
+
 thumbnail:
   width: 1080
   height: 1920
