@@ -135,7 +135,9 @@ def render_highlighted_text(
         line_text = " ".join(line)
         bbox = measure_draw.textbbox((0, 0), line_text, font=font, stroke_width=STROKE_WIDTH)
         line_height = bbox[3] - bbox[1]
-        line_width = bbox[2] - bbox[0]
+        # Add WORD_EXTRA_GAP for each inter-word gap so the centering x matches
+        # what the rendering loop actually draws (which uses extra gap per word pair).
+        line_width = bbox[2] - bbox[0] + WORD_EXTRA_GAP * max(0, len(line) - 1)
         line_metrics.append((line, line_width, line_height))
         total_height += line_height
 
