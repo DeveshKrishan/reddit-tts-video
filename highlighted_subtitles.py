@@ -183,10 +183,11 @@ def create_highlighted_subtitles_clip(
     duration: float,
     video_width: int,
     font_size: int,
+    horizontal_padding: int = 160,
 ) -> VideoClip:
     """Build a subtitle clip that highlights the active spoken word in light green,
     with a pop (scale-in) animation on each newly highlighted word."""
-    max_text_width = video_width - 80
+    max_text_width = video_width - horizontal_padding
     segment_words_list = [(segment, segment_words(segment)) for segment in part_segments]
 
     # Cache: (segment_index, highlight_index | None) → (image, highlighted_word_bbox)

@@ -19,6 +19,9 @@ shorts:
   # Distance in pixels from the bottom of the frame to the bottom of the subtitle block.
   # Keeps subtitles clear of YouTube Shorts UI buttons (~25% from bottom = ~480px on 1920px).
   subtitle_bottom_margin: 320
+  # Total horizontal padding in pixels (split evenly left + right).
+  # Prevents subtitles from reaching the screen edge on phones.
+  subtitle_horizontal_padding: 160
   add_hashtag: true               # append #Shorts to the upload description
   add_subreddit_hashtag: true     # append #SubredditName to the video title
 

@@ -91,6 +91,7 @@ def _render_part(
     subtitle_font_size: int,
     subtitle_position: str,
     subtitle_bottom_margin: int,
+    subtitle_horizontal_padding: int,
     fps: int,
     all_cues: list[SoundCue] | None = None,
     sfx_config: dict | None = None,
@@ -112,6 +113,7 @@ def _render_part(
         duration=duration,
         video_width=clip.w,
         font_size=subtitle_font_size,
+        horizontal_padding=subtitle_horizontal_padding,
     )
     clip = clip.with_audio(part_audio)
     pos = _subtitle_position(clip, subtitles_clip, subtitle_position, subtitle_bottom_margin)
@@ -133,6 +135,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     subtitle_font_size = shorts.get("subtitle_font_size", 42)
     subtitle_position = shorts.get("subtitle_position", "lower_third")
     subtitle_bottom_margin = shorts.get("subtitle_bottom_margin", 320)
+    subtitle_horizontal_padding = shorts.get("subtitle_horizontal_padding", 160)
 
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
@@ -177,6 +180,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             subtitle_font_size=subtitle_font_size,
             subtitle_position=subtitle_position,
             subtitle_bottom_margin=subtitle_bottom_margin,
+            subtitle_horizontal_padding=subtitle_horizontal_padding,
             fps=fps,
             all_cues=all_cues,
             sfx_config=sfx_config,
