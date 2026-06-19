@@ -9,7 +9,7 @@ from config import load_config, load_sfx_config
 from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
-from sound_effects import SoundCue, detect_sound_cues, mix_sound_effects
+from sound_effects import SoundCue, build_intro_cue, detect_sound_cues, mix_sound_effects
 
 
 def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, crop_mode: str) -> VideoFileClip:
@@ -153,11 +153,19 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     sfx_section = load_sfx_config()
     sfx_enabled = sfx_section.get("enabled", False)
     sfx_confidence = sfx_section.get("confidence_threshold", 0.8)
-    sfx_config = sfx_section.get("sfx", {}) if sfx_enabled else None
+    sfx_config: dict | None = sfx_section.get("sfx", {}) if sfx_enabled else None
     sfx_keywords: dict[str, list[str]] = sfx_section.get("keywords", {})
-    all_cues = detect_sound_cues(submission.selftext, segments, sfx_keywords, sfx_confidence) if sfx_enabled else None
+    all_cues: list[SoundCue] | None = (
+        detect_sound_cues(submission.selftext, segments, sfx_keywords, sfx_confidence) if sfx_enabled else None
+    )
     if all_cues:
         logger.info(f"Detected {len(all_cues)} sound cue(s) for submission {submission.id}.")
+
+    intro_result = build_intro_cue(sfx_section.get("intro", {}))
+    if intro_result:
+        _, intro_path = intro_result
+        # Merge intro file path so mix_sound_effects can resolve the "intro" effect.
+        sfx_config = {**(sfx_config or {}), "intro": intro_path}
 
     if audio.duration <= max_duration:
         parts = [(0.0, audio.duration, segments)]
@@ -169,6 +177,21 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     created_videos: list[tuple[str, int, int]] = []
 
     for index, (part_start, part_end, part_segments) in enumerate(parts, start=1):
+        part_cues: list[SoundCue] = list(all_cues or [])
+        if index == 1 and intro_result:
+            intro_cue_base, _ = intro_result
+            # Anchor start_time to the actual part_start (from alignment offsets in
+            # split_segments) so _apply_sfx_to_part's time-range filter always
+            # includes the intro cue even when the first segment starts above 0.0.
+            part_cues = [
+                SoundCue(
+                    effect=intro_cue_base.effect,
+                    start_time=part_start,
+                    end_time=part_start,
+                    volume=intro_cue_base.volume,
+                )
+            ] + part_cues
+
         output_path = _output_path(output_folder, submission.id, index, total_parts)
         _render_part(
             base_clip=base_clip,
@@ -182,7 +205,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             subtitle_bottom_margin=subtitle_bottom_margin,
             subtitle_horizontal_padding=subtitle_horizontal_padding,
             fps=fps,
-            all_cues=all_cues,
+            all_cues=part_cues or None,
             sfx_config=sfx_config,
         )
         created_videos.append((output_path, index, total_parts))

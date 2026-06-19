@@ -7,6 +7,7 @@ TTS audio track.
 
 from __future__ import annotations
 
+import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +65,26 @@ def _find_word_timestamp(word: str, flat_words: list[dict]) -> dict | None:
         if clean == target:
             return entry
     return None
+
+
+def build_intro_cue(intro_config: dict) -> tuple[SoundCue, str] | None:
+    """Pick a random intro SFX file and return a t=0 cue plus the resolved path.
+
+    Returns None when the intro is disabled or no valid files are found.
+    The caller is responsible for injecting the returned path into sfx_config
+    under the key ``"intro"`` so that mix_sound_effects can locate the file.
+    """
+    if not intro_config.get("enabled", False):
+        return None
+    candidates = [f for f in intro_config.get("files", []) if Path(f).exists()]
+    if not candidates:
+        logger.warning("Intro SFX enabled but no valid files found in sfx_config.yaml intro.files — skipping.")
+        return None
+    chosen = random.choice(candidates)
+    volume = float(intro_config.get("volume", 0.6))
+    cue = SoundCue(effect="intro", start_time=0.0, end_time=0.0, volume=volume)
+    logger.info(f"Intro SFX selected: {chosen}")
+    return cue, chosen
 
 
 def detect_sound_cues(
