@@ -5,7 +5,18 @@ contributor gets a working setup out of the box. For royalty-free options, the
 [YouTube Audio Library](https://studio.youtube.com) (Sound Effects tab) is a good
 source — files from there are pre-cleared for YouTube uploads.
 
-## Required files
+## Intro stinger
+
+Plays at the very start of every video to hook the viewer before narration begins.
+From the YouTube Audio Library, pre-cleared for monetization.
+
+| Filename | Character |
+|---|---|
+| `Emergency Radio Alert.mp3` | Urgent alert / EAS tone |
+
+Configure volume and enable/disable in `configs/sfx_config.yaml` under `intro`.
+
+## Contextual SFX (keyword-triggered)
 
 | Filename | Effect | Suggested sound |
 |---|---|---|
@@ -17,5 +28,5 @@ source — files from there are pre-cleared for YouTube uploads.
 
 ## Notes
 
-- File names must match the paths configured in `configs/sfx_config.yaml` under `sfx`
+- File names must match the paths configured in `configs/sfx_config.yaml`
 - Short clips (0.5–3s) work best so they don't overlap each other

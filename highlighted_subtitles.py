@@ -3,7 +3,7 @@ from moviepy import VideoClip
 from PIL import Image, ImageDraw, ImageFont
 
 FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
-HIGHLIGHT_COLOR = "#90EE90"
+HIGHLIGHT_COLOR = "#39FF14"
 TEXT_COLOR = "white"
 STROKE_COLOR = "black"
 STROKE_WIDTH = 4
@@ -16,6 +16,10 @@ WORD_EXTRA_GAP = 12
 POP_SCALE_PEAK = 1.10
 # Fraction of word duration over which the scale-up completes (ease-out cubic).
 POP_RAMP_FRACTION = 0.2
+# Transparent padding (px) added above and below the text canvas so the pop
+# scale animation never clips the top of the first line or the bottom of the
+# last line. Also absorbs font ascenders that sit above the baseline (bbox[1] < 0).
+POP_PADDING = 12
 
 
 def _load_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -144,9 +148,13 @@ def render_highlighted_text(
     if line_metrics:
         total_height += LINE_SPACING * (len(line_metrics) - 1)
 
-    image = Image.new("RGBA", (max_width, max(1, total_height)), (0, 0, 0, 0))
+    # Add POP_PADDING to both top and bottom so the pop-scale animation (which
+    # grows each word by POP_SCALE_PEAK in every direction) never bleeds outside
+    # the canvas. The padding is transparent so it doesn't affect appearance.
+    canvas_height = max(1, total_height + 2 * POP_PADDING)
+    image = Image.new("RGBA", (max_width, canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    y = 0
+    y = POP_PADDING
     word_counter = 0
     highlighted_word_bbox: tuple[int, int, int, int] | None = None
 
@@ -186,7 +194,7 @@ def create_highlighted_subtitles_clip(
     video_width: int,
     font_size: int,
     horizontal_padding: int = 160,
-) -> VideoClip:
+) -> tuple[VideoClip, int]:
     """Build a subtitle clip that highlights the active spoken word in light green,
     with a pop (scale-in) animation on each newly highlighted word."""
     max_text_width = video_width - horizontal_padding
@@ -257,6 +265,11 @@ def create_highlighted_subtitles_clip(
         alpha = np.array(_animated_image(state, t).split()[-1], dtype=float) / 255.0
         return alpha
 
+    # Pre-compute the maximum rendered height across all cached frames so the
+    # caller can anchor the subtitle block's BOTTOM edge (not the top) at a
+    # fixed position above the YouTube Shorts UI buttons.
+    max_subtitle_h = max((img.height for (img, _) in render_cache.values()), default=1)
+
     clip = VideoClip(frame_function, duration=duration, has_constant_size=False)
     mask = VideoClip(mask_function, is_mask=True, duration=duration, has_constant_size=False)
-    return clip.with_mask(mask)
+    return clip.with_mask(mask), max_subtitle_h
