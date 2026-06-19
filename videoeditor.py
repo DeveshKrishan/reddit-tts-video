@@ -9,7 +9,8 @@ from config import load_config, load_sfx_config
 from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
-from sound_effects import SoundCue, build_intro_cue, detect_sound_cues, mix_sound_effects
+from sound_effects import SoundCue, build_background_music_clip, build_intro_cues, detect_sound_cues, mix_sound_effects
+from text_utils import clean_post_text
 
 
 def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, crop_mode: str) -> VideoFileClip:
@@ -95,7 +96,10 @@ def _render_part(
     fps: int,
     all_cues: list[SoundCue] | None = None,
     sfx_config: dict | None = None,
+    bg_music_config: dict | None = None,
 ) -> None:
+    from moviepy import CompositeAudioClip
+
     duration = part_end - part_start
     part_audio = audio.subclipped(part_start, part_end)
 
@@ -106,6 +110,11 @@ def _render_part(
 
     if all_cues is not None and sfx_config:
         part_audio = _apply_sfx_to_part(part_audio, all_cues, part_start, part_end, sfx_config)
+
+    if bg_music_config:
+        bg_clip = build_background_music_clip(bg_music_config, duration)
+        if bg_clip is not None:
+            part_audio = CompositeAudioClip([part_audio, bg_clip]).with_duration(duration)
 
     subtitles_clip = create_highlighted_subtitles_clip(
         part_segments=part_segments,
@@ -144,11 +153,30 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     base_clip = _crop_to_aspect(VideoFileClip("assets/video/input2.mp4"), target_width, target_height, crop_mode)
     audio = AudioFileClip(audio_path)
 
-    # Forced alignment: align the original post text to the TTS audio so subtitles
+    # Forced alignment: align the cleaned post text to the TTS audio so subtitles
     # display the exact words from the post rather than Whisper's transcription guess.
+    # Using clean_post_text ensures the same text that was fed to TTS is used here,
+    # eliminating mismatches from image markdown and bare URLs.
     model = stable_whisper.load_model("base")
-    result = model.align(audio_path, submission.selftext, language="en")
+    clean_text = clean_post_text(submission.selftext)
+    result = model.align(audio_path, clean_text, language="en")
     segments = result.to_dict()["segments"]
+
+    # Alignment quality check: count segments with non-trivial duration. When
+    # stable_whisper can't align the text (e.g. gaming jargon, symbols, poor TTS
+    # match), failed segments get zero or near-zero duration and subtitles never
+    # appear. Fall back to Whisper's own transcription which always gives reliable
+    # timestamps — text may differ slightly but timing is accurate.
+    valid_segs = sum(1 for s in segments if float(s.get("end", 0)) - float(s.get("start", 0)) > 0.1)
+    total_segs = len(segments)
+    logger.info(f"Forced alignment quality: {valid_segs}/{total_segs} segments have valid timing.")
+    if total_segs > 0 and valid_segs / total_segs < 0.5:
+        logger.warning(
+            f"Forced alignment too unreliable ({valid_segs}/{total_segs} valid segments). "
+            "Falling back to Whisper transcription for subtitle timestamps."
+        )
+        result = model.transcribe(audio_path, language="en", word_timestamps=True)
+        segments = result.to_dict()["segments"]
 
     sfx_section = load_sfx_config()
     sfx_enabled = sfx_section.get("enabled", False)
@@ -156,16 +184,19 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     sfx_config: dict | None = sfx_section.get("sfx", {}) if sfx_enabled else None
     sfx_keywords: dict[str, list[str]] = sfx_section.get("keywords", {})
     all_cues: list[SoundCue] | None = (
-        detect_sound_cues(submission.selftext, segments, sfx_keywords, sfx_confidence) if sfx_enabled else None
+        detect_sound_cues(clean_text, segments, sfx_keywords, sfx_confidence) if sfx_enabled else None
     )
     if all_cues:
         logger.info(f"Detected {len(all_cues)} sound cue(s) for submission {submission.id}.")
 
-    intro_result = build_intro_cue(sfx_section.get("intro", {}))
+    bg_music_config: dict | None = sfx_section.get("background_music") if sfx_enabled else None
+
+    intro_result = build_intro_cues(sfx_section.get("intro", {}))
     if intro_result:
-        _, intro_path = intro_result
-        # Merge intro file path so mix_sound_effects can resolve the "intro" effect.
-        sfx_config = {**(sfx_config or {}), "intro": intro_path}
+        # Register each intro file under a unique effect key so mix_sound_effects
+        # can resolve them independently (e.g. "intro_0", "intro_1").
+        extra = {f"intro_{i}": path for i, (_, path) in enumerate(intro_result)}
+        sfx_config = {**(sfx_config or {}), **extra}
 
     if audio.duration <= max_duration:
         parts = [(0.0, audio.duration, segments)]
@@ -179,18 +210,26 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     for index, (part_start, part_end, part_segments) in enumerate(parts, start=1):
         part_cues: list[SoundCue] = list(all_cues or [])
         if index == 1 and intro_result:
-            intro_cue_base, _ = intro_result
-            # Anchor start_time to the actual part_start (from alignment offsets in
-            # split_segments) so _apply_sfx_to_part's time-range filter always
-            # includes the intro cue even when the first segment starts above 0.0.
-            part_cues = [
-                SoundCue(
-                    effect=intro_cue_base.effect,
-                    start_time=part_start,
-                    end_time=part_start,
-                    volume=intro_cue_base.volume,
+            # Build sequential intro cues: each clip starts right after the previous
+            # one ends. Anchor the chain to part_start so the time-range filter in
+            # _apply_sfx_to_part always includes them even with alignment offsets.
+            offset = part_start
+            intro_timed: list[SoundCue] = []
+            for i, (cue_base, path) in enumerate(intro_result):
+                intro_timed.append(
+                    SoundCue(
+                        effect=f"intro_{i}",
+                        start_time=offset,
+                        end_time=offset,
+                        volume=cue_base.volume,
+                    )
                 )
-            ] + part_cues
+                try:
+                    with AudioFileClip(path) as _clip:
+                        offset += _clip.duration
+                except Exception:
+                    logger.warning(f"Could not read duration of intro clip {path}; next cue may overlap.")
+            part_cues = intro_timed + part_cues
 
         output_path = _output_path(output_folder, submission.id, index, total_parts)
         _render_part(
@@ -207,6 +246,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             fps=fps,
             all_cues=part_cues or None,
             sfx_config=sfx_config,
+            bg_music_config=bg_music_config,
         )
         created_videos.append((output_path, index, total_parts))
         logger.info(f"Created Short part {index}/{total_parts}: {output_path}")

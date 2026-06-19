@@ -7,7 +7,6 @@ TTS audio track.
 
 from __future__ import annotations
 
-import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,24 +66,50 @@ def _find_word_timestamp(word: str, flat_words: list[dict]) -> dict | None:
     return None
 
 
-def build_intro_cue(intro_config: dict) -> tuple[SoundCue, str] | None:
-    """Pick a random intro SFX file and return a t=0 cue plus the resolved path.
+def build_intro_cues(intro_config: dict) -> list[tuple[SoundCue, str]] | None:
+    """Return ordered intro SFX cues, one per file in config order.
 
-    Returns None when the intro is disabled or no valid files are found.
-    The caller is responsible for injecting the returned path into sfx_config
-    under the key ``"intro"`` so that mix_sound_effects can locate the file.
+    Each tuple is (SoundCue, file_path). start_time is 0.0 (placeholder);
+    the caller computes actual offsets so files play back-to-back. Returns
+    None when intro is disabled or no valid files are found.
     """
     if not intro_config.get("enabled", False):
         return None
-    candidates = [f for f in intro_config.get("files", []) if Path(f).exists()]
-    if not candidates:
+    files = [f for f in intro_config.get("files", []) if Path(f).exists()]
+    if not files:
         logger.warning("Intro SFX enabled but no valid files found in sfx_config.yaml intro.files — skipping.")
         return None
-    chosen = random.choice(candidates)
-    volume = float(intro_config.get("volume", 0.6))
-    cue = SoundCue(effect="intro", start_time=0.0, end_time=0.0, volume=volume)
-    logger.info(f"Intro SFX selected: {chosen}")
-    return cue, chosen
+    volume = float(intro_config.get("volume", 1.0))
+    cues = []
+    for path in files:
+        cue = SoundCue(effect="intro", start_time=0.0, end_time=0.0, volume=volume)
+        cues.append((cue, path))
+        logger.info(f"Intro SFX queued: {path}")
+    return cues
+
+
+def build_background_music_clip(bg_config: dict, duration: float):
+    """Return a background music clip trimmed/looped to `duration` seconds.
+
+    The clip is mixed at low volume so it sits behind the TTS narration.
+    Returns None when disabled or the file is missing.
+    """
+    from moviepy import AudioFileClip, afx, concatenate_audioclips
+
+    if not bg_config.get("enabled", False):
+        return None
+    path = bg_config.get("file", "")
+    if not Path(path).exists():
+        logger.warning(f"Background music file not found: {path} — skipping.")
+        return None
+    volume = float(bg_config.get("volume", 0.15))
+    clip = AudioFileClip(path)
+    if clip.duration < duration:
+        n_loops = int(duration / clip.duration) + 1
+        clip = concatenate_audioclips([clip] * n_loops)
+    clip = clip.subclipped(0, duration).with_effects([afx.MultiplyVolume(volume)])
+    logger.info(f"Background music: {path} at volume {volume}")
+    return clip
 
 
 def detect_sound_cues(

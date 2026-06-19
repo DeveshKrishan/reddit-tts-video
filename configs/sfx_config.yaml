@@ -1,16 +1,23 @@
 enabled: true
 confidence_threshold: 0.8
 
-# Intro stinger played at t=0 of part 1 to hook the viewer before narration.
-# One file is picked at random per video so the opening never sounds identical.
+# Intro stingers played sequentially at t=0 of part 1 to hook the viewer.
+# Files play in the order listed — first "Crash Metal", then "Reverberating Slam".
 # Only "first_only" is supported for parts; "all" can be added later.
 intro:
   enabled: true
   files:
-    - assets/sfx/Reverberating Slam.mp3
     - assets/sfx/Crash Metal Sweetener Distant.mp3
+    - assets/sfx/Reverberating Slam.mp3
   volume: 1.0
   parts: first_only
+
+# Continuous background music mixed under the TTS narration for every part.
+# Volume should be low (0.10–0.20) so it never competes with the spoken audio.
+background_music:
+  enabled: true
+  file: "assets/sfx/Shining (feat. Leon Albertson & Adryon de León) - Leon Albertson feat. Adryon de León.mp3"
+  volume: 0.07
 
 # Paths to royalty-free SFX files (download from YouTube Audio Library).
 # Files are gitignored — add them locally under assets/sfx/.

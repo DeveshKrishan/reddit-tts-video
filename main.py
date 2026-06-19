@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import fetch_content as fetch_content
 from config import load_config
 from logger import logger
+from text_utils import clean_post_text
 from tts import generate_tts
 from videoeditor import create_videos
 from youtube import upload_video
@@ -23,7 +24,7 @@ def main() -> None:
 
     for submission in submissions:
         title = submission.title
-        content = submission.selftext
+        content = clean_post_text(submission.selftext)
         author = submission.author.name if submission.author else "Unknown"
         submission_id = submission.id
 
