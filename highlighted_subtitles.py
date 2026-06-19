@@ -3,7 +3,7 @@ from moviepy import VideoClip
 from PIL import Image, ImageDraw, ImageFont
 
 FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
-HIGHLIGHT_COLOR = "#90EE90"
+HIGHLIGHT_COLOR = "#39FF14"
 TEXT_COLOR = "white"
 STROKE_COLOR = "black"
 STROKE_WIDTH = 4
