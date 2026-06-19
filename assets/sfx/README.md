@@ -5,16 +5,14 @@ contributor gets a working setup out of the box. For royalty-free options, the
 [YouTube Audio Library](https://studio.youtube.com) (Sound Effects tab) is a good
 source — files from there are pre-cleared for YouTube uploads.
 
-## Intro stingers (randomized per video)
+## Intro stinger
 
-One of these is picked at random for the first second of every video to hook
-the viewer before narration begins. Both are from the YouTube Audio Library and
-are pre-cleared for monetization.
+Plays at the very start of every video to hook the viewer before narration begins.
+From the YouTube Audio Library, pre-cleared for monetization.
 
 | Filename | Character |
 |---|---|
-| `Reverberating Slam.mp3` | Heavy dramatic impact |
-| `Crash Metal Sweetener Distant.mp3` | Metallic crash, slightly lighter |
+| `Emergency Radio Alert.mp3` | Urgent alert / EAS tone |
 
 Configure volume and enable/disable in `configs/sfx_config.yaml` under `intro`.
 

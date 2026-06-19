@@ -1,14 +1,12 @@
 enabled: true
 confidence_threshold: 0.8
 
-# Intro stingers played sequentially at t=0 of part 1 to hook the viewer.
-# Files play in the order listed — first "Crash Metal", then "Reverberating Slam".
+# Intro stinger played at t=0 of part 1 to hook the viewer before narration.
 # Only "first_only" is supported for parts; "all" can be added later.
 intro:
   enabled: true
   files:
-    - assets/sfx/Crash Metal Sweetener Distant.mp3
-    - assets/sfx/Reverberating Slam.mp3
+    - assets/sfx/Emergency Radio Alert.mp3
   volume: 1.0
   parts: first_only
 

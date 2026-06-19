@@ -39,15 +39,15 @@ def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, 
 
 def _subtitle_position(
     clip: VideoFileClip,
-    subtitles_clip,
+    subtitle_h: int,
     position: str,
     bottom_margin: int = 320,
 ) -> tuple[str, int] | tuple[str, str]:
     if position == "lower_third":
-        # Anchor the bottom of the subtitle block at a fixed margin above the frame bottom.
-        # This prevents multi-line wrapping from pushing text off-screen or under
-        # YouTube Shorts' overlay buttons.
-        subtitle_h = subtitles_clip.size[1] if subtitles_clip.size[1] > 1 else 0
+        # Anchor the BOTTOM of the tallest possible subtitle block at a fixed
+        # margin above the frame bottom, so YouTube Shorts UI buttons never
+        # overlap the text. subtitle_h is the pre-computed max height from the
+        # render cache (not the t=0 size), so all frames are positioned correctly.
         y = max(0, clip.h - bottom_margin - subtitle_h)
         return ("center", y)
     return ("center", "center")
@@ -116,7 +116,7 @@ def _render_part(
         if bg_clip is not None:
             part_audio = CompositeAudioClip([part_audio, bg_clip]).with_duration(duration)
 
-    subtitles_clip = create_highlighted_subtitles_clip(
+    subtitles_clip, max_subtitle_h = create_highlighted_subtitles_clip(
         part_segments=part_segments,
         part_start=part_start,
         duration=duration,
@@ -125,7 +125,7 @@ def _render_part(
         horizontal_padding=subtitle_horizontal_padding,
     )
     clip = clip.with_audio(part_audio)
-    pos = _subtitle_position(clip, subtitles_clip, subtitle_position, subtitle_bottom_margin)
+    pos = _subtitle_position(clip, max_subtitle_h, subtitle_position, subtitle_bottom_margin)
     final_video = CompositeVideoClip([clip, subtitles_clip.with_position(pos)])
     final_video.write_videofile(output_path, fps=fps)
 
