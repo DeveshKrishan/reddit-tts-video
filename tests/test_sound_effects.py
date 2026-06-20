@@ -10,6 +10,8 @@ TEST_KEYWORDS: dict[str, list[str]] = {
     "suspense": ["suddenly", "then it happened"],
 }
 
+TEST_PROFANITY = ({"shit", "fuck", "bitch"}, ["son of a bitch"])
+
 
 def _make_segments(words: list[tuple[str, float, float]]) -> list[dict]:
     """Build minimal Whisper-style segments with word timestamps."""
@@ -30,22 +32,57 @@ class TestDetectSoundCues(unittest.TestCase):
     def _detect(self, raw_text: str, words: list[tuple[str, float, float]], **kwargs) -> list[SoundCue]:
         segments = _make_segments(words)
         kwargs.setdefault("keyword_categories", TEST_KEYWORDS)
-        with patch("sound_effects._load_profanity_list", return_value={"damn", "shit", "fuck"}):
+        with patch("sound_effects._load_profanity_list", return_value=TEST_PROFANITY):
             return detect_sound_cues(raw_text, segments, **kwargs)
 
     def test_empty_segments_returns_no_cues(self) -> None:
-        with patch("sound_effects._load_profanity_list", return_value={"damn"}):
-            cues = detect_sound_cues("damn", [], TEST_KEYWORDS, confidence_threshold=0.8)
+        with patch("sound_effects._load_profanity_list", return_value=({"fuck"}, [])):
+            cues = detect_sound_cues("what the fuck", [], TEST_KEYWORDS, confidence_threshold=0.8)
         self.assertEqual(cues, [])
 
     def test_profanity_word_produces_bleep_cue(self) -> None:
         cues = self._detect(
-            "he said damn it", [("he", 0.0, 0.3), ("said", 0.3, 0.6), ("damn", 0.6, 0.9), ("it", 0.9, 1.1)]
+            "he said fuck it", [("he", 0.0, 0.3), ("said", 0.3, 0.6), ("fuck", 0.6, 0.9), ("it", 0.9, 1.1)]
         )
         profanity_cues = [c for c in cues if c.effect == "profanity"]
         self.assertEqual(len(profanity_cues), 1)
         self.assertAlmostEqual(profanity_cues[0].start_time, 0.6)
         self.assertAlmostEqual(profanity_cues[0].end_time, 0.9)
+
+    def test_mild_language_not_in_list_produces_no_bleep(self) -> None:
+        cues = self._detect(
+            "what the damn hell",
+            [("what", 0.0, 0.2), ("the", 0.2, 0.4), ("damn", 0.4, 0.6), ("hell", 0.6, 0.9)],
+        )
+        profanity_cues = [c for c in cues if c.effect == "profanity"]
+        self.assertEqual(profanity_cues, [])
+
+    def test_whisper_word_not_in_raw_text_produces_no_bleep(self) -> None:
+        with patch("sound_effects._load_profanity_list", return_value=({"shit"}, [])):
+            cues = detect_sound_cues(
+                "everything was fine",
+                _make_segments([("everything", 0.0, 0.5), ("was", 0.5, 0.7), ("shit", 0.7, 1.0)]),
+                TEST_KEYWORDS,
+            )
+        profanity_cues = [c for c in cues if c.effect == "profanity"]
+        self.assertEqual(profanity_cues, [])
+
+    def test_phrase_produces_bleep_for_each_word(self) -> None:
+        cues = self._detect(
+            "he is a son of a bitch",
+            [
+                ("he", 0.0, 0.2),
+                ("is", 0.2, 0.3),
+                ("a", 0.3, 0.4),
+                ("son", 0.4, 0.5),
+                ("of", 0.5, 0.6),
+                ("a", 0.6, 0.7),
+                ("bitch", 0.7, 1.0),
+            ],
+        )
+        profanity_cues = [c for c in cues if c.effect == "profanity"]
+        self.assertEqual(len(profanity_cues), 4)
+        self.assertEqual([c.start_time for c in profanity_cues], [0.4, 0.5, 0.6, 0.7])
 
     def test_no_profanity_produces_no_bleep(self) -> None:
         cues = self._detect("everything was fine", [("everything", 0.0, 0.5), ("was", 0.5, 0.7), ("fine", 0.7, 1.0)])

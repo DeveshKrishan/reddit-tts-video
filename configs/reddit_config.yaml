@@ -15,8 +15,8 @@ production:
 
   subreddits:
     - name: AITAH
-      limit: 1
+      limit: 3
     - name: AmIOverreacting
-      limit: 1
+      limit: 2
     - name: EntitledPeople
       limit: 1

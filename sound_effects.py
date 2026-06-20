@@ -31,12 +31,80 @@ class SoundCue:
     volume: float = 1.0
 
 
-def _load_profanity_list() -> set[str]:
+def _load_profanity_list() -> tuple[set[str], list[str]]:
+    """Return (single_words, multi_word_phrases) from configs/profanity_list.yaml."""
     if not PROFANITY_LIST_PATH.exists():
         logger.warning(f"Profanity list not found at {PROFANITY_LIST_PATH}; bleep detection disabled.")
-        return set()
+        return set(), []
     data = yaml.safe_load(PROFANITY_LIST_PATH.read_text()) or {}
-    return {w.strip().lower() for w in data.get("words", []) if w.strip()}
+    words = [w.strip().lower() for w in data.get("words", []) if w.strip()]
+    single = {w for w in words if " " not in w}
+    phrases = [w for w in words if " " in w]
+    return single, phrases
+
+
+def _clean_word(word: str) -> str:
+    return re.sub(r"[^\w]", "", word.lower())
+
+
+def _word_in_text(word: str, text_lower: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(word)}\b", text_lower))
+
+
+def _find_phrase_word_entries(phrase: str, flat_words: list[dict]) -> list[dict]:
+    """Return every Whisper word entry that belongs to a matching phrase occurrence."""
+    phrase_words = [_clean_word(w) for w in phrase.split()]
+    n = len(phrase_words)
+    if n == 0:
+        return []
+    matches: list[dict] = []
+    for i in range(len(flat_words) - n + 1):
+        window = [_clean_word(flat_words[i + j]["word"]) for j in range(n)]
+        if window == phrase_words:
+            matches.extend(flat_words[i : i + n])
+    return matches
+
+
+def _detect_profanity_cues(
+    raw_text: str,
+    flat_words: list[dict],
+    single_words: set[str],
+    phrases: list[str],
+) -> list[SoundCue]:
+    """Detect bleep cues for curse words present in the raw Reddit text."""
+    cues: list[SoundCue] = []
+    text_lower = raw_text.lower()
+    seen_spans: set[tuple[float, float]] = set()
+
+    def add_cue(entry: dict) -> None:
+        span = (entry["start"], entry["end"])
+        if span in seen_spans:
+            return
+        seen_spans.add(span)
+        cues.append(
+            SoundCue(
+                effect="profanity",
+                start_time=entry["start"],
+                end_time=entry["end"],
+                volume=1.0,
+            )
+        )
+        logger.debug(f"Profanity bleep cue at t={entry['start']:.2f}s: '{entry['word']}'")
+
+    for phrase in phrases:
+        if phrase not in text_lower:
+            continue
+        for entry in _find_phrase_word_entries(phrase, flat_words):
+            add_cue(entry)
+
+    for word in single_words:
+        if not _word_in_text(word, text_lower):
+            continue
+        for entry in flat_words:
+            if _clean_word(entry["word"]) == word:
+                add_cue(entry)
+
+    return cues
 
 
 def _flatten_word_timestamps(segments: list[dict]) -> list[dict]:
@@ -120,9 +188,9 @@ def detect_sound_cues(
 ) -> list[SoundCue]:
     """Detect sound cue trigger points from raw Reddit text and Whisper segments.
 
-    Profanity is detected against the raw text before TTS synthesis (more
-    reliable than Whisper transcription). Keyword categories are also scanned
-    in the raw text and mapped to Whisper word timestamps for precise placement.
+    Profanity is detected against the raw Reddit text (before TTS), then mapped
+    to Whisper word timestamps for precise ducking and bleep placement. Keyword
+    categories are also scanned in the raw text and mapped to Whisper timestamps.
 
     Args:
         raw_text: The original Reddit post body text.
@@ -137,22 +205,9 @@ def detect_sound_cues(
     """
     cues: list[SoundCue] = []
     flat_words = _flatten_word_timestamps(segments)
-    profanity_set = _load_profanity_list()
+    single_words, phrases = _load_profanity_list()
+    cues.extend(_detect_profanity_cues(raw_text, flat_words, single_words, phrases))
     text_lower = raw_text.lower()
-
-    # --- Profanity bleeps (scan every Whisper word against the profanity list) ---
-    for entry in flat_words:
-        clean = re.sub(r"[^\w]", "", entry["word"])
-        if clean in profanity_set:
-            cues.append(
-                SoundCue(
-                    effect="profanity",
-                    start_time=entry["start"],
-                    end_time=entry["end"],
-                    volume=1.0,
-                )
-            )
-            logger.debug(f"Profanity bleep cue at t={entry['start']:.2f}s: '{entry['word']}'")
 
     # --- Keyword categories (scan raw text, map to first matching Whisper word) ---
     for category, keywords in keyword_categories.items():

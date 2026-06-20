@@ -14,14 +14,14 @@ intro:
 # Volume should be low (0.10–0.20) so it never competes with the spoken audio.
 background_music:
   enabled: true
-  file: "assets/sfx/Shining (feat. Leon Albertson & Adryon de León) - Leon Albertson feat. Adryon de León.mp3"
+  file: "assets/sfx/On The Eve - The Grey Room _ Density & Time.mp3"
   volume: 0.07
 
 # Paths to royalty-free SFX files (download from YouTube Audio Library).
 # Files are gitignored — add them locally under assets/sfx/.
 # See assets/sfx/README.md for the full list of required filenames.
 sfx:
-  profanity: assets/sfx/bleep.wav
+  profanity: assets/sfx/Fart Toot.mp3
   shocking: assets/sfx/gasp.wav
   funny: assets/sfx/rimshot.wav
   sad: assets/sfx/sad_sting.wav

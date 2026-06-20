@@ -11,7 +11,7 @@ FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
 HIGHLIGHT_COLOR = "#39FF14"
 TEXT_COLOR = "white"
 STROKE_COLOR = "black"
-STROKE_WIDTH = 4
+STROKE_WIDTH = 10
 LINE_SPACING = 8
 # Extra pixels added between words on top of a normal space, giving the pop
 # animation room to expand without clipping into adjacent words.
@@ -25,6 +25,48 @@ POP_RAMP_FRACTION = 0.2
 # scale animation never clips the top of the first line or the bottom of the
 # last line. Also absorbs font ascenders that sit above the baseline (bbox[1] < 0).
 POP_PADDING = 12
+
+# Punctuation stripped for on-screen captions (TikTok-style). Sentence chunking
+# still uses the raw Whisper words so boundaries like "it." / "it's" stay intact.
+_DISPLAY_STRIP = str.maketrans("", "", ".,;:\"'`")
+
+
+def _display_word(word: str) -> str:
+    """Return a caption-safe word with most punctuation removed (? and ! kept)."""
+    cleaned = word.translate(_DISPLAY_STRIP)
+    return cleaned or word
+
+
+# Minimum font size when shrinking a group to fit the subtitle canvas width.
+MIN_FONT_SIZE = 48
+
+
+def _line_width_for_words(words: list[str], font: ImageFont.FreeTypeFont | ImageFont.ImageFont) -> int:
+    """Measure rendered single-line width including inter-word gaps."""
+    if not words:
+        return 0
+    measure = Image.new("RGBA", (1, 1))
+    draw = ImageDraw.Draw(measure)
+    width = 0
+    for index, word in enumerate(words):
+        bbox = draw.textbbox((0, 0), word, font=font, stroke_width=STROKE_WIDTH)
+        word_w = bbox[2] - bbox[0]
+        if index == 0:
+            width = word_w
+        else:
+            width += int(draw.textlength(" ", font=font)) + WORD_EXTRA_GAP + word_w
+    return width
+
+
+def _fit_font_size(words: list[str], font_size: int, max_width: int) -> int:
+    """Return the largest font size <= font_size where words fit within max_width."""
+    size = font_size
+    while size >= MIN_FONT_SIZE:
+        font = _load_font(size)
+        if _line_width_for_words(words, font) <= max_width:
+            return size
+        size -= 2
+    return MIN_FONT_SIZE
 
 
 def _load_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -59,26 +101,9 @@ def segment_words(segment: dict) -> list[dict]:
     ]
 
 
-def _wrap_word_lines(words: list[str], font: ImageFont.ImageFont, max_width: int) -> list[list[str]]:
-    measure = Image.new("RGBA", (max_width, 10), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(measure)
-    lines: list[list[str]] = []
-    current: list[str] = []
-
-    for word in words:
-        trial = " ".join(current + [word]) if current else word
-        bbox = draw.textbbox((0, 0), trial, font=font, stroke_width=STROKE_WIDTH)
-        # Account for extra inter-word gap when checking if line exceeds max width.
-        extra = WORD_EXTRA_GAP * max(0, len(current))
-        if bbox[2] - bbox[0] + extra > max_width and current:
-            lines.append(current)
-            current = [word]
-        else:
-            current.append(word)
-
-    if current:
-        lines.append(current)
-    return lines or [[]]
+def _wrap_word_lines(words: list[str]) -> list[list[str]]:
+    """Return all words on one caption line — no line wrapping."""
+    return [words] if words else [[]]
 
 
 def _pop_scale(progress: float) -> float:
@@ -127,26 +152,25 @@ def render_highlighted_text(
     font_size: int,
     max_width: int,
 ) -> tuple[Image.Image, tuple[int, int, int, int] | None]:
-    """Render wrapped caption text with one highlighted word.
+    """Render single-line caption text with one highlighted word.
 
     Returns:
         A tuple of (rendered image, highlighted_word_bbox).
         highlighted_word_bbox is (x, y, w, h) within the image, or None.
     """
-    font = _load_font(font_size)
+    fitted_size = _fit_font_size(words, font_size, max_width)
+    font = _load_font(fitted_size)
     measure = Image.new("RGBA", (max_width, 10), (0, 0, 0, 0))
     measure_draw = ImageDraw.Draw(measure)
-    lines = _wrap_word_lines(words, font, max_width)
+    lines = _wrap_word_lines(words)
 
     line_metrics: list[tuple[list[str], int, int]] = []
     total_height = 0
     for line in lines:
+        line_width = _line_width_for_words(line, font)
         line_text = " ".join(line)
         bbox = measure_draw.textbbox((0, 0), line_text, font=font, stroke_width=STROKE_WIDTH)
         line_height = bbox[3] - bbox[1]
-        # Add WORD_EXTRA_GAP for each inter-word gap so the centering x matches
-        # what the rendering loop actually draws (which uses extra gap per word pair).
-        line_width = bbox[2] - bbox[0] + WORD_EXTRA_GAP * max(0, len(line) - 1)
         line_metrics.append((line, line_width, line_height))
         total_height += line_height
 
@@ -164,7 +188,7 @@ def render_highlighted_text(
     highlighted_word_bbox: tuple[int, int, int, int] | None = None
 
     for line, line_width, line_height in line_metrics:
-        x = (max_width - line_width) // 2
+        x = max(0, (max_width - line_width) // 2)
         for word in line:
             color = HIGHLIGHT_COLOR if word_counter == highlight_index else TEXT_COLOR
             draw.text(
@@ -192,22 +216,89 @@ def render_highlighted_text(
     return image, highlighted_word_bbox
 
 
+def _pad_image_to_height(
+    image: Image.Image,
+    word_bbox: tuple[int, int, int, int] | None,
+    target_h: int,
+) -> tuple[Image.Image, tuple[int, int, int, int] | None]:
+    """Pad a rendered subtitle image to a fixed height, vertically centered."""
+    if image.height >= target_h:
+        return image, word_bbox
+    padded = Image.new("RGBA", (image.width, target_h), (0, 0, 0, 0))
+    offset_y = (target_h - image.height) // 2
+    padded.paste(image, (0, offset_y), image)
+    if word_bbox is None:
+        return padded, None
+    x, y, w, h = word_bbox
+    return padded, (x, y + offset_y, w, h)
+
+
+def _ends_sentence(word: str) -> bool:
+    return bool(word) and word[-1] in ".!?"
+
+
+def _split_into_sentences(flat: list[dict]) -> list[list[dict]]:
+    """Split a flat word list into sentence-sized groups using trailing punctuation."""
+    sentences: list[list[dict]] = []
+    current: list[dict] = []
+    for word_info in flat:
+        current.append(word_info)
+        if _ends_sentence(word_info["word"]):
+            sentences.append(current)
+            current = []
+    if current:
+        sentences.append(current)
+    return sentences
+
+
+def _chunk_sentence_by_width(
+    sentence: list[dict],
+    max_words_per_group: int,
+    max_width: int,
+    font_size: int,
+) -> list[list[dict]]:
+    """Pack words into single-line groups that fit within max_width."""
+    font = _load_font(font_size)
+    groups: list[list[dict]] = []
+    current: list[dict] = []
+    current_display: list[str] = []
+
+    for word_info in sentence:
+        display = _display_word(word_info["word"])
+        trial_words = current + [word_info]
+        trial_display = current_display + [display]
+
+        over_word_cap = len(trial_display) > max_words_per_group
+        over_width = _line_width_for_words(trial_display, font) > max_width
+
+        if current and (over_word_cap or over_width):
+            groups.append(current)
+            current = [word_info]
+            current_display = [display]
+        else:
+            current = trial_words
+            current_display = trial_display
+
+    if current:
+        groups.append(current)
+    return groups
+
+
 def _rechunk_words(
     segment_words_list: list[tuple[dict, list[dict]]],
     max_words_per_group: int,
+    max_width: int,
+    font_size: int,
 ) -> list[list[dict]]:
-    """Flatten all Whisper word dicts and rechunk into fixed-size groups.
+    """Flatten Whisper word dicts and rechunk into on-screen groups.
 
-    Each group is shown on screen simultaneously, replacing the full-segment
-    display. Smaller groups (3–4 words) create the TikTok-style caption effect
-    that keeps viewers engaged.
+    Groups never span sentence boundaries. Within each sentence, groups respect
+    max_words_per_group and are split early when display width exceeds max_width.
     """
     flat = [w for _, words in segment_words_list for w in words]
     groups: list[list[dict]] = []
-    for i in range(0, len(flat), max_words_per_group):
-        chunk = flat[i : i + max_words_per_group]
-        if chunk:
-            groups.append(chunk)
+    for sentence in _split_into_sentences(flat):
+        groups.extend(_chunk_sentence_by_width(sentence, max_words_per_group, max_width, font_size))
     return groups
 
 
@@ -233,13 +324,13 @@ def create_highlighted_subtitles_clip(
     max_text_width = video_width - horizontal_padding
     segment_words_list = [(segment, segment_words(segment)) for segment in part_segments]
 
-    # Rechunk words into fixed-size groups for TikTok-style display.
-    word_groups: list[list[dict]] = _rechunk_words(segment_words_list, max_words_per_group)
+    # Rechunk by sentence, word cap, and pixel width so nothing clips horizontally.
+    word_groups: list[list[dict]] = _rechunk_words(segment_words_list, max_words_per_group, max_text_width, font_size)
 
     # Cache: (group_index, highlight_index | None) → (image, highlighted_word_bbox)
     render_cache: dict[tuple[int, int | None], tuple[Image.Image, tuple[int, int, int, int] | None]] = {}
     for group_index, group in enumerate(word_groups):
-        word_text = [w["word"] for w in group]
+        word_text = [_display_word(w["word"]) for w in group]
         render_cache[(group_index, None)] = render_highlighted_text(word_text, None, font_size, max_text_width)
         for highlight_index in range(len(group)):
             render_cache[(group_index, highlight_index)] = render_highlighted_text(
@@ -272,6 +363,12 @@ def create_highlighted_subtitles_clip(
                 return group_index, highlight_index
         return None
 
+    # Normalize every frame to the same height so vertical centering on the
+    # video frame stays correct even when some groups wrap to more lines.
+    max_subtitle_h = max((img.height for (img, _) in render_cache.values()), default=1)
+    for key, (image, bbox) in list(render_cache.items()):
+        render_cache[key] = _pad_image_to_height(image, bbox, max_subtitle_h)
+
     def _animated_image(state: tuple[int, int | None], t: float) -> Image.Image:
         """Return the subtitle image with the pop animation applied for time t."""
         image, word_bbox = render_cache[state]
@@ -293,21 +390,16 @@ def create_highlighted_subtitles_clip(
     def frame_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
-            return np.zeros((1, max_text_width, 3), dtype=np.uint8)
+            return np.zeros((max_subtitle_h, max_text_width, 3), dtype=np.uint8)
         return np.array(_animated_image(state, t).convert("RGB"))
 
     def mask_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
-            return np.zeros((1, max_text_width), dtype=float)
+            return np.zeros((max_subtitle_h, max_text_width), dtype=float)
         alpha = np.array(_animated_image(state, t).split()[-1], dtype=float) / 255.0
         return alpha
 
-    # Pre-compute the maximum rendered height across all cached frames so the
-    # caller can anchor the subtitle block's BOTTOM edge (not the top) at a
-    # fixed position above the YouTube Shorts UI buttons.
-    max_subtitle_h = max((img.height for (img, _) in render_cache.values()), default=1)
-
-    clip = VideoClip(frame_function, duration=duration, has_constant_size=False)
-    mask = VideoClip(mask_function, is_mask=True, duration=duration, has_constant_size=False)
+    clip = VideoClip(frame_function, duration=duration, has_constant_size=True)
+    mask = VideoClip(mask_function, is_mask=True, duration=duration, has_constant_size=True)
     return clip.with_mask(mask), max_subtitle_h

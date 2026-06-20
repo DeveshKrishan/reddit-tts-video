@@ -43,6 +43,9 @@ def _subtitle_position(
     position: str,
     bottom_margin: int = 320,
 ) -> tuple[str, int] | tuple[str, str]:
+    if position == "center":
+        y = max(0, (clip.h - subtitle_h) // 2)
+        return ("center", y)
     if position == "lower_third":
         # Anchor the BOTTOM of the tallest possible subtitle block at a fixed
         # margin above the frame bottom, so YouTube Shorts UI buttons never

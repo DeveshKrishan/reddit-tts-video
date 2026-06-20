@@ -20,7 +20,7 @@ Configure volume and enable/disable in `configs/sfx_config.yaml` under `intro`.
 
 | Filename | Effect | Suggested sound |
 |---|---|---|
-| `bleep.wav` | Profanity bleep | TV-style bleep tone |
+| `Fart Toot.mp3` | Profanity | Fart toot (replaces TV bleep) |
 | `gasp.wav` | Shocking / OMG | Dramatic gasp or sting |
 | `rimshot.wav` | Funny / Comedic | Rimshot, vine boom, or bruh |
 | `sad_sting.wav` | Sad / Emotional | Short sad violin or piano sting |
