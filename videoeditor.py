@@ -2,7 +2,7 @@ import os
 import ssl
 
 import stable_whisper
-from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip, vfx
+from moviepy import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip, concatenate_audioclips, vfx
 from moviepy.video.fx.Loop import Loop
 
 from config import load_config, load_sfx_config
@@ -11,6 +11,7 @@ from logger import logger
 from parts import split_segments
 from sound_effects import SoundCue, build_background_music_clip, build_intro_cues, detect_sound_cues, mix_sound_effects
 from text_utils import clean_post_text
+from thumbnail import create_thumbnail
 
 
 def _crop_to_aspect(clip: VideoFileClip, target_width: int, target_height: int, crop_mode: str) -> VideoFileClip:
@@ -62,6 +63,86 @@ def _output_path(output_folder: str, submission_id: str, part: int, total_parts:
     return f"{output_folder}/{submission_id}_part{part}.mov"
 
 
+def _offset_segment_timestamps(segments: list[dict], offset: float) -> list[dict]:
+    """Shift Whisper segment and word timestamps by `offset` seconds."""
+    if offset <= 0:
+        return segments
+    shifted: list[dict] = []
+    for segment in segments:
+        new_segment = dict(segment)
+        new_segment["start"] = float(segment.get("start", 0)) + offset
+        new_segment["end"] = float(segment.get("end", 0)) + offset
+        words = []
+        for word in segment.get("words") or []:
+            words.append(
+                {
+                    **word,
+                    "start": float(word.get("start", 0)) + offset,
+                    "end": float(word.get("end", 0)) + offset,
+                }
+            )
+        new_segment["words"] = words
+        shifted.append(new_segment)
+    return shifted
+
+
+def _build_faded_thumbnail_clip(
+    thumbnail_path: str,
+    title_duration: float,
+    fade_in: float,
+    fade_out: float,
+):
+    """Build a centered post card clip that fades in/out over the gameplay via alpha."""
+    hold_duration = max(title_duration, fade_in)
+    clip_duration = hold_duration + fade_out
+    card_clip = (
+        ImageClip(thumbnail_path, transparent=True).with_duration(clip_duration).with_position(("center", "center"))
+    )
+
+    mask = card_clip.mask
+    if mask is None:
+        return card_clip, clip_duration
+
+    mask_effects = []
+    if fade_in > 0:
+        mask_effects.append(vfx.FadeIn(fade_in))
+    if fade_out > 0:
+        mask_effects.append(vfx.FadeOut(fade_out))
+    if mask_effects:
+        card_clip = card_clip.with_mask(mask.with_effects(mask_effects))
+    return card_clip, clip_duration
+
+
+def _load_narration_audio(submission, thumbnail_enabled: bool) -> tuple[AudioFileClip, float]:
+    """Load body narration and prepend title audio when the thumbnail intro is enabled."""
+    config = load_config()
+    tts_config = config.get("tts", {})
+    audio_path = f"assets/audio/{submission.id}.mp3"
+    title_audio_path = f"assets/audio/{submission.id}_title.mp3"
+    body_audio = AudioFileClip(audio_path)
+
+    if not thumbnail_enabled:
+        return body_audio, 0.0
+
+    if not os.path.exists(title_audio_path):
+        from tts import generate_tts
+
+        logger.info(f"Generating missing title narration for submission {submission.id}.")
+        generate_tts(
+            text=submission.title,
+            output_path=title_audio_path,
+            voice=tts_config.get("voice", "en-US-GuyNeural"),
+            rate=tts_config.get("rate", "+10%"),
+            pitch=tts_config.get("pitch", "+0Hz"),
+        )
+
+    title_audio = AudioFileClip(title_audio_path)
+    title_duration = title_audio.duration
+    audio = concatenate_audioclips([title_audio, body_audio])
+    logger.info(f"Prepended title narration ({title_duration:.2f}s) for submission {submission.id}.")
+    return audio, title_duration
+
+
 def _apply_sfx_to_part(
     part_audio: AudioFileClip,
     all_cues: list[SoundCue],
@@ -101,6 +182,11 @@ def _render_part(
     all_cues: list[SoundCue] | None = None,
     sfx_config: dict | None = None,
     bg_music_config: dict | None = None,
+    thumbnail_path: str | None = None,
+    title_duration: float = 0.0,
+    thumbnail_fade_in: float = 0.0,
+    thumbnail_fade_out: float = 0.0,
+    subtitle_delay: float = 0.0,
 ) -> None:
     from moviepy import CompositeAudioClip
 
@@ -128,10 +214,22 @@ def _render_part(
         font_size=subtitle_font_size,
         horizontal_padding=subtitle_horizontal_padding,
         max_words_per_group=subtitle_max_words_per_group,
+        subtitle_delay=subtitle_delay,
     )
     clip = clip.with_audio(part_audio)
     pos = _subtitle_position(clip, max_subtitle_h, subtitle_position, subtitle_bottom_margin)
-    final_video = CompositeVideoClip([clip, subtitles_clip.with_position(pos)])
+
+    layers: list = [clip]
+    if thumbnail_path and title_duration > 0:
+        card_clip, _ = _build_faded_thumbnail_clip(
+            thumbnail_path,
+            title_duration=title_duration,
+            fade_in=thumbnail_fade_in,
+            fade_out=thumbnail_fade_out,
+        )
+        layers.append(card_clip)
+    layers.append(subtitles_clip.with_position(pos))
+    final_video = CompositeVideoClip(layers)
     final_video.write_videofile(output_path, fps=fps)
 
 
@@ -151,13 +249,17 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     subtitle_bottom_margin = shorts.get("subtitle_bottom_margin", 320)
     subtitle_horizontal_padding = shorts.get("subtitle_horizontal_padding", 120)
     subtitle_max_words_per_group = shorts.get("subtitle_max_words_per_group", 4)
+    thumbnail_config = config.get("thumbnail", {})
+    thumbnail_enabled = thumbnail_config.get("enabled", False)
+    thumbnail_fade_in = float(thumbnail_config.get("fade_in_seconds", 0.4))
+    thumbnail_fade_out = float(thumbnail_config.get("fade_out_seconds", 0.5))
+    thumbnail_sfx_volume = float(thumbnail_config.get("sfx_volume", 1.0))
 
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
 
     audio_path = f"assets/audio/{submission.id}.mp3"
-    base_clip = _crop_to_aspect(VideoFileClip("assets/video/input2.mp4"), target_width, target_height, crop_mode)
-    audio = AudioFileClip(audio_path)
+    audio, title_duration = _load_narration_audio(submission, thumbnail_enabled)
 
     # Forced alignment: align the cleaned post text to the TTS audio so subtitles
     # display the exact words from the post rather than Whisper's transcription guess.
@@ -166,7 +268,8 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
     model = stable_whisper.load_model("base")
     clean_text = clean_post_text(submission.selftext)
     result = model.align(audio_path, clean_text, language="en")
-    segments = result.to_dict()["segments"]
+    segments = _offset_segment_timestamps(result.to_dict()["segments"], title_duration)
+    base_clip = _crop_to_aspect(VideoFileClip("assets/video/input2.mp4"), target_width, target_height, crop_mode)
 
     # Alignment quality check: count segments with non-trivial duration. When
     # stable_whisper can't align the text (e.g. gaming jargon, symbols, poor TTS
@@ -182,7 +285,7 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             "Falling back to Whisper transcription for subtitle timestamps."
         )
         result = model.transcribe(audio_path, language="en", word_timestamps=True)
-        segments = result.to_dict()["segments"]
+        segments = _offset_segment_timestamps(result.to_dict()["segments"], title_duration)
 
     sfx_section = load_sfx_config()
     sfx_enabled = sfx_section.get("enabled", False)
@@ -212,9 +315,28 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
 
     total_parts = len(parts)
     created_videos: list[tuple[str, int, int]] = []
+    thumbnail_path: str | None = None
+    if thumbnail_enabled:
+        thumbnail_path = create_thumbnail(submission)
+        if sfx_config is not None and thumbnail_config.get("sfx"):
+            sfx_config = {**sfx_config, "thumbnail_pop": thumbnail_config["sfx"]}
 
     for index, (part_start, part_end, part_segments) in enumerate(parts, start=1):
         part_cues: list[SoundCue] = list(all_cues or [])
+        part_thumbnail_path: str | None = None
+        part_subtitle_delay = 0.0
+        if index == 1 and thumbnail_path:
+            part_thumbnail_path = thumbnail_path
+            part_subtitle_delay = max(title_duration, thumbnail_fade_in) + thumbnail_fade_out
+            part_cues.insert(
+                0,
+                SoundCue(
+                    effect="thumbnail_pop",
+                    start_time=part_start,
+                    end_time=part_start,
+                    volume=thumbnail_sfx_volume,
+                ),
+            )
         if index == 1 and intro_result:
             # Build sequential intro cues: each clip starts right after the previous
             # one ends. Anchor the chain to part_start so the time-range filter in
@@ -254,6 +376,11 @@ def create_videos(submission) -> list[tuple[str, int, int]]:
             all_cues=part_cues or None,
             sfx_config=sfx_config,
             bg_music_config=bg_music_config,
+            thumbnail_path=part_thumbnail_path,
+            title_duration=title_duration if part_thumbnail_path else 0.0,
+            thumbnail_fade_in=thumbnail_fade_in if part_thumbnail_path else 0.0,
+            thumbnail_fade_out=thumbnail_fade_out if part_thumbnail_path else 0.0,
+            subtitle_delay=part_subtitle_delay,
         )
         created_videos.append((output_path, index, total_parts))
         logger.info(f"Created Short part {index}/{total_parts}: {output_path}")

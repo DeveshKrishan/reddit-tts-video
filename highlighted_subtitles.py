@@ -310,6 +310,7 @@ def create_highlighted_subtitles_clip(
     font_size: int,
     horizontal_padding: int = 120,
     max_words_per_group: int = 4,
+    subtitle_delay: float = 0.0,
 ) -> tuple[VideoClip, int]:
     """Build a subtitle clip that highlights the active spoken word in neon green,
     with a pop (scale-in) animation on each newly highlighted word.
@@ -347,6 +348,8 @@ def create_highlighted_subtitles_clip(
             )
 
     def active_state(t: float) -> tuple[int, int | None] | None:
+        if t < subtitle_delay:
+            return None
         for group_index, group in enumerate(word_groups):
             if not group:
                 continue

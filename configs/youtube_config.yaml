@@ -61,8 +61,13 @@ tags:
       - karen
 
 thumbnail:
-  width: 1080
-  height: 1920
+  enabled: true
+  card_width: 900
+  fade_in_seconds: 0.4
+  fade_out_seconds: 0.5
+  username: "The Daily Redditor"
+  sfx: assets/sfx/Rake Swing Whoosh Close.mp3
+  sfx_volume: 1.0
 
 # Text-to-speech settings (Microsoft Edge neural voices — free, no API key needed).
 # Voice options: en-US-GuyNeural, en-US-ChristopherNeural, en-US-AriaNeural, en-US-JennyNeural

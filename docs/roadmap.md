@@ -90,6 +90,17 @@ Automatically overlay contextual sound effects onto the generated video based on
 - Allow per-category overrides (e.g. disable bleeps but keep funny SFX)
 - Expose settings in `reddit_config.yaml` under a `sound_effects:` section
 
+### Thumbnail intro (part 1 hook)
+
+Shipped on `feat/thumbnail-intro`. Before body narration on part 1, the pipeline:
+
+1. Generates `{id}_title.mp3` (title-only TTS) and prepends it to the body audio track.
+2. Overlays a centered Reddit post card PNG (`thumbnail.render_post_card()`) with mask-based fade in/out.
+3. Plays a rake whoosh at `t=0` and delays the Emergency Radio intro stinger until after the title finishes.
+4. Hides highlighted subtitles until `title_duration + fade_out_seconds`.
+
+Configure via `thumbnail:` in `configs/youtube_config.yaml`. See `docs/view-to-swipe-ratio.md` §3.1 for retention rationale.
+
 ### Decisions
 
 - **Bleep detection source:** Run on the raw Reddit text (before TTS). Whisper sometimes mishears or omits profanity, so scanning the source text before synthesis gives more reliable detection. The word's timestamp is still sourced from Whisper for precise audio ducking.

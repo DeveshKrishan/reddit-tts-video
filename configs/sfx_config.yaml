@@ -22,6 +22,7 @@ background_music:
 # See assets/sfx/README.md for the full list of required filenames.
 sfx:
   profanity: assets/sfx/Fart Toot.mp3
+  thumbnail_pop: assets/sfx/Rake Swing Whoosh Close.mp3
   shocking: assets/sfx/gasp.wav
   funny: assets/sfx/rimshot.wav
   sad: assets/sfx/sad_sting.wav

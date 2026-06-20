@@ -16,6 +16,18 @@ From the YouTube Audio Library, pre-cleared for monetization.
 
 Configure volume and enable/disable in `configs/sfx_config.yaml` under `intro`.
 
+When the in-video thumbnail intro is enabled (`thumbnail.enabled` in `youtube_config.yaml`), the intro stinger is delayed until after the title narration finishes so it does not mask the spoken hook.
+
+## Thumbnail intro pop
+
+Plays at `t=0` when the Reddit post card fades in on part 1. Pairs with the visual card overlay.
+
+| Filename | Character |
+|---|---|
+| `Rake Swing Whoosh Close.mp3` | Short whoosh / pop |
+
+Mapped in `configs/sfx_config.yaml` as `sfx.thumbnail_pop`. Volume is capped in `youtube_config.yaml` under `thumbnail.sfx_volume`.
+
 ## Contextual SFX (keyword-triggered)
 
 | Filename | Effect | Suggested sound |
