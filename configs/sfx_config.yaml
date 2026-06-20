@@ -21,7 +21,7 @@ background_music:
 # Files are gitignored — add them locally under assets/sfx/.
 # See assets/sfx/README.md for the full list of required filenames.
 sfx:
-  profanity: assets/sfx/bleep.wav
+  profanity: assets/sfx/Fart Toot.mp3
   shocking: assets/sfx/gasp.wav
   funny: assets/sfx/rimshot.wav
   sad: assets/sfx/sad_sting.wav
