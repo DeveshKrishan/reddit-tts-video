@@ -43,6 +43,7 @@
     - Train LLM to recognise "Best Post" of the day characteristics and properties to further improve rating efficacy. Could allow to webscrape by "new" posts
 - Phase 4: Capture metadata about processes
     - Have LLMs store metrics about render time, memory usage to improve efficency in a database
+    - **Implemented (v1):** process CPU/RSS metrics via `psutil` — see `observability/README.md`
 
 ## 5. Sound Effects Engine
 

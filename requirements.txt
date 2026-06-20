@@ -50,6 +50,7 @@ praw==8.0.1
 prawcore==4.0.0
 proglog==0.1.12
 propcache==0.5.2
+psutil==6.1.1
 pyparsing==3.1.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.0
