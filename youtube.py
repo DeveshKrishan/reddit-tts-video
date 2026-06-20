@@ -163,6 +163,44 @@ def _build_tags(
     return result
 
 
+def _build_description(
+    submission: praw.models.Submission,
+    *,
+    part: int | None = None,
+    total_parts: int | None = None,
+    tags: list[str] | None = None,
+    add_shorts_hashtag: bool = False,
+) -> str:
+    """Build the YouTube upload description.
+
+    YouTube descriptions are plain text only — markdown/HTML anchor tags are not
+    supported. Bare https:// URLs are auto-linked by YouTube (blue, clickable).
+    """
+    post_url = f"https://www.reddit.com{submission.permalink}"
+    author = submission.author if submission.author else "[deleted]"
+
+    lines = [
+        f"Source: r/{submission.subreddit} · u/{author}",
+        "",
+        "Read the original post:",
+        post_url,
+        "",
+        "If you enjoyed this video, please like, comment, and subscribe for more Reddit stories!",
+        "Share with your friends and let us know your thoughts below.",
+    ]
+    description = "\n".join(lines)
+
+    if part and total_parts and total_parts > 1:
+        description = f"Part {part} of {total_parts}\n\n{description}"
+
+    if tags:
+        description += "\n\n" + " ".join(f"#{t}" for t in tags)
+    elif add_shorts_hashtag:
+        description += "\n\n#Shorts"
+
+    return description
+
+
 REFRESH_TOKEN_HELP = (
     "Your YouTube refresh token is invalid or expired. "
     "Regenerate it with: python3 get_youtube_refresh_token.py\n"
@@ -233,20 +271,14 @@ def upload_video(
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    post_url = f"https://www.reddit.com{submission.permalink}"
-    description = (
-        f"'{submission.title}' by u/{submission.author} in r/{submission.subreddit}\n"
-        f"Original post: {post_url}\n\n"
-        "If you enjoyed this video, please like, comment, and subscribe for more Reddit stories!\n"
-        "Share with your friends and let us know your thoughts below."
-    )
-    if part and total_parts and total_parts > 1:
-        description = f"Part {part} of {total_parts}\n\n{description}"
     tags = _build_tags(submission, tags_config)
-    if tags:
-        description += "\n\n" + " ".join(f"#{t}" for t in tags)
-    elif shorts_config.get("enabled") and shorts_config.get("add_hashtag", True):
-        description += "\n\n#Shorts"
+    description = _build_description(
+        submission,
+        part=part,
+        total_parts=total_parts,
+        tags=tags,
+        add_shorts_hashtag=bool(not tags and shorts_config.get("enabled") and shorts_config.get("add_hashtag", True)),
+    )
 
     safe_title = submission.title if submission.title else "Reddit Story"
     safe_title = "".join(c for c in safe_title if c.isprintable())

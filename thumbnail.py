@@ -59,7 +59,7 @@ def render_post_card(submission: praw.models.Submission, card_width: int = 900) 
     profile_radius = 52
     title = submission.title
 
-    header_height = profile_radius * 2 + 24
+    header_height = profile_radius * 2 + 64
     footer_height = 56
     content_width = card_width - 2 * CARD_PADDING
     title_area_height = 420
@@ -80,19 +80,23 @@ def render_post_card(submission: praw.models.Submission, card_width: int = 900) 
     card.paste(card_bg, mask=card_mask)
     draw = ImageDraw.Draw(card)
 
-    profile_y = CARD_PADDING + profile_radius
+    font_user = _load_font(40)
+    font_subreddit = _load_font(32)
+    subreddit_label = f"r/{submission.subreddit}"
+    emoji_size = 40
+
+    user_x = CARD_PADDING + 2 * profile_radius + 18
+    user_y = CARD_PADDING
+    user_bbox = draw.textbbox((user_x, user_y), username, font=font_user)
+
     pfp_img = Image.open("assets/sololevelingpfp.jpg").convert("RGBA")
     pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), Image.LANCZOS)
     pfp_mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
     pfp_draw = ImageDraw.Draw(pfp_mask)
     pfp_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
-    _paste_rgba(card, pfp_img, (CARD_PADDING, profile_y - profile_radius))
+    _paste_rgba(card, pfp_img, (CARD_PADDING, user_bbox[1]))
 
-    font_user = _load_font(40)
-    user_x = CARD_PADDING + 2 * profile_radius + 18
-    user_y = profile_y - 18
     draw.text((user_x, user_y), username, font=font_user, fill="black")
-
     user_bbox = draw.textbbox((user_x, user_y), username, font=font_user)
     verified_img = Image.open("assets/emojis/verified.png").convert("RGBA")
     verified_size = 28
@@ -102,6 +106,10 @@ def render_post_card(submission: praw.models.Submission, card_width: int = 900) 
         verified_img,
         (user_bbox[2] + 8, user_y + (user_bbox[3] - user_bbox[1]) // 2 - verified_size // 2),
     )
+
+    subreddit_y = user_bbox[3] + 6
+    draw.text((user_x, subreddit_y), subreddit_label, font=font_subreddit, fill="gray")
+    subreddit_bbox = draw.textbbox((user_x, subreddit_y), subreddit_label, font=font_subreddit)
 
     emoji_files = [
         "assets/emojis/diamond.png",
@@ -113,9 +121,8 @@ def render_post_card(submission: praw.models.Submission, card_width: int = 900) 
         "assets/emojis/skull.png",
         "assets/emojis/shocked.png",
     ]
-    emoji_size = 40
     emoji_gap = 8
-    emoji_y = user_y + (user_bbox[3] - user_bbox[1]) + 10
+    emoji_y = subreddit_bbox[3] + 10
     emoji_x = user_x
     for emoji_path in emoji_files:
         emoji_img = Image.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), Image.LANCZOS)
