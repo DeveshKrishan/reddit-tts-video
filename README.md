@@ -43,6 +43,8 @@ flowchart TD
 
 Production runs (`DEBUG = False`) always export to Grafana Cloud over OTLP. Each run also emits structured JSON metrics to stdout (phase duration, CPU, memory).
 
+![Grafana dashboard — Reddit TTS Video service overview](assets/images/grafana-dashboard.png)
+
 | Signal | Examples |
 |--------|----------|
 | **Metrics** | Phase duration, CPU/memory every 1s, upload success/errors |
