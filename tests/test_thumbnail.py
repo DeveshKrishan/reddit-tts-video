@@ -33,6 +33,7 @@ class TestThumbnail(unittest.TestCase):
         submission = MagicMock()
         submission.title = title
         submission.id = "abc123"
+        submission.subreddit = "test"
         return submission
 
     def test_render_post_card_is_transparent_overlay(self) -> None:
@@ -45,6 +46,21 @@ class TestThumbnail(unittest.TestCase):
         self.assertGreater(card.size[1], 200)
         alpha = card.split()[-1]
         self.assertLess(alpha.getextrema()[0], 255)
+
+    def test_render_post_card_shows_subreddit(self) -> None:
+        from thumbnail import render_post_card
+
+        submission = self._submission()
+        submission.subreddit = "AmItTheAsshole"
+
+        with patch("thumbnail.ImageDraw.Draw") as mock_draw_cls:
+            mock_draw = mock_draw_cls.return_value
+            mock_draw.textbbox.return_value = (0, 0, 200, 40)
+            mock_draw.multiline_textbbox.return_value = (0, 0, 800, 120)
+            render_post_card(submission, card_width=900)
+
+        rendered_text = [call.args[1] for call in mock_draw.text.call_args_list if call.args]
+        self.assertIn("r/AmItTheAsshole", rendered_text)
 
     @patch("thumbnail.render_post_card")
     @patch("thumbnail.os.makedirs")
