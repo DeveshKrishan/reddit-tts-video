@@ -7,60 +7,102 @@ from PIL import Image, ImageDraw, ImageFont
 from config import load_config
 from logger import logger
 
+FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
+CARD_CORNER_RADIUS = 20
+CARD_PADDING = 28
 
-def create_thumbnail(submission: praw.models.Submission) -> None:
-    """
-    Create a YouTube thumbnail for the submission with an orange background, title, and author.
-    """
 
+def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    try:
+        return ImageFont.truetype(FONT_PATH, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _paste_rgba(base: Image.Image, overlay: Image.Image, position: tuple[int, int]) -> None:
+    base.paste(overlay, position, overlay)
+
+
+def _rounded_rect_mask(size: tuple[int, int], radius: int) -> Image.Image:
+    mask = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle((0, 0, size[0] - 1, size[1] - 1), radius=radius, fill=255)
+    return mask
+
+
+def _fit_wrapped_title(
+    draw: ImageDraw.ImageDraw,
+    title: str,
+    max_text_width: int,
+    available_height: int,
+) -> tuple[str, ImageFont.FreeTypeFont | ImageFont.ImageFont, int]:
+    wrapped_title = title
+    text_h = 0
+    font_title = _load_font(60)
+    for font_size in range(72, 27, -2):
+        font_title = _load_font(font_size)
+        for wrap_width in range(36, 8, -1):
+            wrapped = textwrap.fill(title, width=wrap_width)
+            bbox = draw.multiline_textbbox((0, 0), wrapped, font=font_title)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            if text_h <= available_height and text_w <= max_text_width:
+                return wrapped, font_title, text_h
+            wrapped_title = wrapped
+    return wrapped_title, font_title, text_h
+
+
+def render_post_card(submission: praw.models.Submission, card_width: int = 900) -> Image.Image:
+    """Render a Reddit-style post card with a transparent background for video overlay."""
     thumbnail_config = load_config().get("thumbnail", {})
-    width = thumbnail_config.get("width", 1080)
-    height = thumbnail_config.get("height", 1920)
-    background_color = (255, 255, 255)  # White
+    username = thumbnail_config.get("username", "The Daily Redditor")
+    profile_radius = 52
     title = submission.title
 
-    img = Image.new("RGB", (width, height), color=background_color)
-    draw = ImageDraw.Draw(img)
+    header_height = profile_radius * 2 + 24
+    footer_height = 56
+    content_width = card_width - 2 * CARD_PADDING
+    title_area_height = 420
 
-    # Load font (fallback to default if not found)
-    try:
-        font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 60)
-    except OSError:
-        font_title = ImageFont.load_default()
+    measure = Image.new("RGBA", (content_width, title_area_height), (0, 0, 0, 0))
+    measure_draw = ImageDraw.Draw(measure)
+    wrapped_title, font_title, text_h = _fit_wrapped_title(
+        measure_draw,
+        title,
+        content_width,
+        title_area_height,
+    )
 
-    profile_radius = 60
-    _ = 40 + profile_radius
-    profile_y = 40 + profile_radius  # Move profile up
+    card_height = CARD_PADDING + header_height + 24 + text_h + 24 + footer_height + CARD_PADDING
+    card = Image.new("RGBA", (card_width, card_height), (0, 0, 0, 0))
+    card_mask = _rounded_rect_mask((card_width, card_height), CARD_CORNER_RADIUS)
+    card_bg = Image.new("RGBA", (card_width, card_height), (255, 255, 255, 255))
+    card.paste(card_bg, mask=card_mask)
+    draw = ImageDraw.Draw(card)
 
-    # Draw a profile picture using the provided pfp image
+    profile_y = CARD_PADDING + profile_radius
     pfp_img = Image.open("assets/sololevelingpfp.jpg").convert("RGBA")
     pfp_img = pfp_img.resize((2 * profile_radius, 2 * profile_radius), Image.LANCZOS)
-    mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
-    img.paste(pfp_img, (40, profile_y - profile_radius), mask)
-    username = "The Daily Redditor"
-    try:
-        font_user = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 44)
-    except OSError:
-        font_user = ImageFont.load_default()
-    user_w, user_h = draw.textbbox((0, 0), username, font=font_user)[2:]
+    pfp_mask = Image.new("L", (2 * profile_radius, 2 * profile_radius), 0)
+    pfp_draw = ImageDraw.Draw(pfp_mask)
+    pfp_draw.ellipse((0, 0, 2 * profile_radius, 2 * profile_radius), fill=255)
+    _paste_rgba(card, pfp_img, (CARD_PADDING, profile_y - profile_radius))
 
-    gap = 10
-    left_x = 40 + 2 * profile_radius + 20
-    block_y = profile_y - (user_h + gap + 44) // 2  # 44 is emoji_size
-    user_x = left_x
-    user_y = block_y
-    emoji_x = left_x
-    emoji_y = user_y + user_h + gap
+    font_user = _load_font(40)
+    user_x = CARD_PADDING + 2 * profile_radius + 18
+    user_y = profile_y - 18
     draw.text((user_x, user_y), username, font=font_user, fill="black")
 
+    user_bbox = draw.textbbox((user_x, user_y), username, font=font_user)
     verified_img = Image.open("assets/emojis/verified.png").convert("RGBA")
-    verified_size = 32
+    verified_size = 28
     verified_img = verified_img.resize((verified_size, verified_size), Image.LANCZOS)
-    check_x = user_x + user_w + 10
-    check_y = user_y + user_h // 2 - verified_size // 2
-    img.paste(verified_img, (int(check_x), int(check_y)), verified_img)
+    _paste_rgba(
+        card,
+        verified_img,
+        (user_bbox[2] + 8, user_y + (user_bbox[3] - user_bbox[1]) // 2 - verified_size // 2),
+    )
+
     emoji_files = [
         "assets/emojis/diamond.png",
         "assets/emojis/fire.png",
@@ -71,76 +113,64 @@ def create_thumbnail(submission: praw.models.Submission) -> None:
         "assets/emojis/skull.png",
         "assets/emojis/shocked.png",
     ]
-    emoji_size = 44
-    emoji_gap = 10
-    emoji_x = left_x
+    emoji_size = 40
+    emoji_gap = 8
+    emoji_y = user_y + (user_bbox[3] - user_bbox[1]) + 10
+    emoji_x = user_x
     for emoji_path in emoji_files:
         emoji_img = Image.open(emoji_path).convert("RGBA").resize((emoji_size, emoji_size), Image.LANCZOS)
-        img.paste(emoji_img, (int(emoji_x), int(emoji_y)), emoji_img)
+        _paste_rgba(card, emoji_img, (int(emoji_x), int(emoji_y)))
         emoji_x += emoji_size + emoji_gap
 
-    icon_y = height - 80
-
-    title_top = profile_y + profile_radius + 30
-    title_bottom = icon_y - 30  # leave some gap above the icons
-    available_height = title_bottom - title_top
-    padding_x = 30
-    max_text_width = width - 2 * padding_x
-    # Dynamically adjust font size and wrapping to fit the space and width
-    max_font_size = 80
-    min_font_size = 28
-    wrapped_title = title
-    for font_size in range(max_font_size, min_font_size - 1, -2):
-        try:
-            font_title = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", font_size)
-        except OSError:
-            font_title = ImageFont.load_default()
-        # Try much larger wrap widths to fit more words per line
-        for wrap_width in range(40, 8, -1):
-            wrapped = textwrap.fill(title, width=wrap_width)
-            bbox = draw.multiline_textbbox((0, 0), wrapped, font=font_title)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-            if text_h <= available_height and text_w <= max_text_width:
-                wrapped_title = wrapped
-                break
-        if text_h <= available_height and text_w <= max_text_width:
-            break
-    text_x = padding_x
-    text_y = title_top + (available_height - text_h) // 2  # center vertically in available space
+    title_top = CARD_PADDING + header_height + 12
+    text_x = CARD_PADDING
+    text_y = title_top
     draw.multiline_text((text_x, text_y), wrapped_title, font=font_title, fill="black", align="left")
 
-    icon_y = height - 80
-    try:
-        font_icon = ImageFont.truetype("assets/fonts/Poppins-Medium.ttf", 40)
-    except OSError:
-        font_icon = ImageFont.load_default()
-    left_x = 30  # match the left padding used elsewhere
+    icon_y = card_height - CARD_PADDING - 40
+    font_icon = _load_font(34)
     heart_img = Image.open("assets/emojis/heart.png").convert("RGBA")
-    heart_size = 40
+    heart_size = 36
     heart_img = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
     heart_text = "99+"
-    _, _, heart_text_w, heart_text_h = draw.textbbox((0, 0), heart_text, font=font_icon)
-    # Place heart and 99+ left-aligned, with 99+ to the right of the image
-    heart_img_x = left_x
-    heart_img_y = icon_y
-    heart_text_x = heart_img_x + heart_size + 20  # increased gap from 10 to 20
-    heart_text_y = heart_img_y + (heart_size - heart_text_h) // 2 - 5
-    img.paste(heart_img, (heart_img_x, heart_img_y), heart_img)
-    draw.text((heart_text_x, heart_text_y), heart_text, font=font_icon, fill="gray")
-    icon_gap = 50
+    heart_text_bbox = draw.textbbox((0, 0), heart_text, font=font_icon)
+    heart_text_w = heart_text_bbox[2] - heart_text_bbox[0]
+    heart_text_h = heart_text_bbox[3] - heart_text_bbox[1]
+    heart_img_x = CARD_PADDING
+    _paste_rgba(card, heart_img, (heart_img_x, icon_y))
+    draw.text(
+        (heart_img_x + heart_size + 16, icon_y + (heart_size - heart_text_h) // 2 - 4),
+        heart_text,
+        font=font_icon,
+        fill="gray",
+    )
+
     conversation_img = Image.open("assets/emojis/conversation.png").convert("RGBA")
-    conversation_size = 40
+    conversation_size = 36
     conversation_img = conversation_img.resize((conversation_size, conversation_size), Image.LANCZOS)
     comment_text = "99+"
-    _, _, comment_text_w, comment_text_h = draw.textbbox((0, 0), comment_text, font=font_icon)
-    conversation_img_x = left_x + heart_size + heart_text_w + icon_gap
-    conversation_img_y = icon_y
-    comment_text_x = conversation_img_x + conversation_size + 20  # increased gap from 10 to 20
-    comment_text_y = conversation_img_y + (conversation_size - comment_text_h) // 2 - 5
-    img.paste(conversation_img, (conversation_img_x, conversation_img_y), conversation_img)
-    draw.text((comment_text_x, comment_text_y), comment_text, font=font_icon, fill="gray")
+    comment_text_bbox = draw.textbbox((0, 0), comment_text, font=font_icon)
+    comment_text_h = comment_text_bbox[3] - comment_text_bbox[1]
+    conversation_img_x = heart_img_x + heart_size + heart_text_w + 48
+    _paste_rgba(card, conversation_img, (conversation_img_x, icon_y))
+    draw.text(
+        (conversation_img_x + conversation_size + 16, icon_y + (conversation_size - comment_text_h) // 2 - 4),
+        comment_text,
+        font=font_icon,
+        fill="gray",
+    )
+
+    return card
+
+
+def create_thumbnail(submission: praw.models.Submission) -> str:
+    """Generate and save a transparent post card PNG for in-video overlay."""
+    thumbnail_config = load_config().get("thumbnail", {})
+    card_width = int(thumbnail_config.get("card_width", 900))
+    card = render_post_card(submission, card_width=card_width)
 
     os.makedirs("assets/thumbnails", exist_ok=True)
-    img.save(f"assets/thumbnails/{submission.id}.jpg")
-    logger.info(f"Thumbnail saved to assets/thumbnails/{submission.id}.jpg")
+    output_path = f"assets/thumbnails/{submission.id}.png"
+    card.save(output_path)
+    logger.info(f"Post card saved to {output_path}")
+    return output_path

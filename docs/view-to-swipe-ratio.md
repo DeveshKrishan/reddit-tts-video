@@ -26,13 +26,13 @@ Shorts data consistently shows ~60–70% of viewers who leave do so in the **fir
 | Factor | Where It Lives | Current State |
 |--------|----------------|---------------|
 | Post selection quality | `configs/reddit_config.yaml`, `fetch_content.py`, `reddit_sources.py` | Uses Reddit `top` ranking (upvote-validated) — considered solved |
-| Opening hook (title card) | `videoeditor.py` | Not implemented — starts straight into narration |
+| Opening hook (title card) | `thumbnail.py`, `videoeditor.py`, `youtube_config.yaml` | Part 1: centered Reddit post card + title TTS; subtitles hidden until card fades out |
 | Subtitle readability | `highlighted_subtitles.py`, `youtube_config.yaml` | TikTok-style: 4 words on screen, 72px neon green highlight + pop animation |
 | TTS voice/speed | `youtube_config.yaml` → `tts.py` | `en-US-GuyNeural`, +10% speed |
 | Tags/discoverability | `youtube.py`, `youtube_config.yaml` | Tiered tag system in place |
 | Video title | `youtube.py` | Post title + subreddit hashtag |
 | Background footage | `videoeditor.py` | Single hardcoded `assets/video/input2.mp4` |
-| Sound effects | `sound_effects.py`, `configs/sfx_config.yaml` | Keyword/profanity-triggered SFX; Emergency Radio Alert intro + background music |
+| Sound effects | `sound_effects.py`, `configs/sfx_config.yaml` | Keyword/profanity-triggered SFX; Emergency Radio Alert intro (delayed when thumbnail intro is on) + rake whoosh on card pop + background music |
 
 ---
 
@@ -65,33 +65,41 @@ shorts:
 
 ---
 
-### 3.1 Title Card Hook Overlay (Proposal — High Impact)
+### 3.1 Title Card Hook Overlay (Implemented — High Impact)
 
 **Problem:** Video starts directly into narration with no visual context; the viewer can't tell what the story is about in the first second.
 
-**Proposed design:** Overlay the Reddit post title as a styled card for the first ~2 seconds, fading out as narration begins.
+**Implemented design:** On part 1 only, overlay a centered Reddit-style post card (transparent RGBA PNG) over the gameplay footage. The post title is narrated via a separate `{id}_title.mp3` track prepended to the body audio; card visibility is driven by title duration plus configurable fade in/out. Subtitles stay hidden until the card is fully gone (`subtitle_delay = title_duration + fade_out`).
 
-- Rendered with PIL using the subtitle font (`Poppins-Medium`).
-- Semi-transparent dark panel behind text for readability over any footage.
-- Fades out over ~0.3s at the 2s mark.
+- Rendered with PIL in `thumbnail.render_post_card()` — wraps/shrinks long titles (72px → 28px).
+- Alpha mask fade (`FadeIn`/`FadeOut` on mask, not RGB) avoids a black flash on transparent pixels.
+- Rake whoosh SFX at card pop (`t=0`); Emergency Radio intro stinger delayed until after title narration.
 
 ```yaml
-shorts:
-  title_card_enabled: true
-  title_card_duration: 2.0      # seconds visible
-  title_card_fade_duration: 0.3 # fade-out duration
+# configs/youtube_config.yaml
+thumbnail:
+  enabled: true
+  card_width: 900
+  fade_in_seconds: 0.4
+  fade_out_seconds: 0.5
+  username: "The Daily Redditor"
+  sfx: assets/sfx/Rake Swing Whoosh Close.mp3
+  sfx_volume: 0.45
 ```
 
 **Touch points:**
-- `videoeditor.py` — compose a title-card clip over the first N seconds in `_render_part`.
-- new helper (e.g. `title_card.py`) — render the styled title image.
-- `youtube_config.yaml` — config knobs above.
+- `thumbnail.py` — `render_post_card()` RGBA card PNG
+- `main.py` — generates `{id}_title.mp3` when thumbnail is enabled
+- `videoeditor.py` — card overlay, title audio prepend, SFX timing, subtitle delay
+- `highlighted_subtitles.py` — `subtitle_delay` parameter
+- `configs/sfx_config.yaml` — `sfx.thumbnail_pop`
+- `tests/test_thumbnail.py` — unit tests for card rendering
 
-**Why it works:** Showing the title immediately tells the viewer *"this is a story about X"* so they opt in before narration. Highest-leverage fix for the first-3-second drop.
+**Why it works:** Showing and *hearing* the title immediately tells the viewer *"this is a story about X"* so they opt in before body narration. Highest-leverage fix for the first-3-second drop.
 
-**Open questions:**
-- Show on every part, or only part 1?
-- Truncate long titles to N lines, or shrink font to fit?
+**Decisions:**
+- Part 1 only (multi-part stories keep the hook on the opening segment).
+- Long titles wrap and shrink font rather than hard-truncate.
 
 ---
 
@@ -99,7 +107,7 @@ shorts:
 
 **Problem:** The audio previously opened cold on the narration. A short, punchy intro sound signals *"a story is starting"* and pairs with the visual hook.
 
-**Implemented design:** Reuse the existing SFX engine. An always-on intro cue at `t=0` for part 1 fires via `build_intro_cues()` in `sound_effects.py`.
+**Implemented design:** Reuse the existing SFX engine. An intro cue for part 1 fires via `build_intro_cues()` in `sound_effects.py`. When the thumbnail intro is enabled, this stinger is delayed until after title narration so the spoken hook is audible; the rake whoosh at `t=0` covers the card pop instead.
 
 **Sound asset (YouTube Audio Library):**
 
@@ -132,7 +140,6 @@ intro:
 
 - **Footage variety:** Rotate among 3–5 background clips (random pick per video) to keep visuals fresh and lift session watch time. Requires multiple files in `assets/video/`.
 - **TTS voice testing:** A/B `en-US-ChristopherNeural` (authoritative, conflict posts) and `en-US-AriaNeural` (relationship/AITAH) vs. current default. Possibly drop rate to `+5%` for clarity.
-- **Narrated title line:** Prepend the post title as the first TTS line so the hook is heard, not just shown.
 - **Upload timing experiments:** Test 12–2pm and 7–9pm PST slots vs. current 7am.
 
 ---
@@ -154,7 +161,7 @@ Read the retention graph per video: a sharp drop at 0–3s means the hook needs 
 
 1. ~~Land subtitle chunking (3.0)~~ — shipped on `feat/bigger-subtitles`.
 2. ~~Land intro sound (3.2)~~ — shipped on `feat/cursor-skills`.
-3. Land title card (3.1) behind `title_card_enabled`.
+3. ~~Land title card (3.1)~~ — shipped on `feat/thumbnail-intro`.
 4. Run with `DEBUG=True` locally; review output videos manually.
-5. Enable in production config; monitor retention for 1–2 weeks vs. baseline.
+5. Monitor retention for 1–2 weeks vs. baseline with thumbnail intro enabled.
 6. Decide on follow-ups based on metrics.

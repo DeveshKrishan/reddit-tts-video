@@ -21,6 +21,7 @@ def main() -> None:
 
     submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    thumbnail_config = config.get("thumbnail", {})
 
     for submission in submissions:
         title = submission.title
@@ -28,12 +29,23 @@ def main() -> None:
         author = submission.author.name if submission.author else "Unknown"
         submission_id = submission.id
 
+        tts_kwargs = {
+            "voice": tts_config.get("voice", "en-US-GuyNeural"),
+            "rate": tts_config.get("rate", "+10%"),
+            "pitch": tts_config.get("pitch", "+0Hz"),
+        }
+
+        if thumbnail_config.get("enabled", False):
+            generate_tts(
+                text=title,
+                output_path=f"{OUTPUT_FOLDER}/{submission_id}_title.mp3",
+                **tts_kwargs,
+            )
+
         generate_tts(
             text=content,
             output_path=f"{OUTPUT_FOLDER}/{submission_id}.mp3",
-            voice=tts_config.get("voice", "en-US-GuyNeural"),
-            rate=tts_config.get("rate", "+10%"),
-            pitch=tts_config.get("pitch", "+0Hz"),
+            **tts_kwargs,
         )
 
         logger.info(f"Saved audio for submission: {title} by {author}. Submission ID: {submission_id}")

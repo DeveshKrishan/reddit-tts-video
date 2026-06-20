@@ -15,13 +15,15 @@ The following flowchart illustrates the end-to-end process, from fetching Reddit
 
 ```mermaid
 flowchart TD
-    RedditAPI[Reddit API / PRAW] -->|Fetches posts| GTTS[gTTS]
+    RedditAPI[Reddit API / PRAW] -->|Fetches posts| TTS[Edge TTS]
+    RedditAPI -->|Post data| ThumbnailCard[thumbnail.py]
     RedditAPI -->|Post data| Pillow[Pillow]
-    GTTS -->|Audio MP3| Whisper[OpenAI Whisper]
-    GTTS -->|Audio MP3| MoviePy[MoviePy]
-    Whisper -->|Subtitles| MoviePy
+    TTS -->|Title + body MP3| Whisper[OpenAI Whisper]
+    TTS -->|Audio MP3| MoviePy[MoviePy]
+    ThumbnailCard -->|Post card overlay part 1| MoviePy
+    Whisper -->|Subtitles delayed past intro| MoviePy
     MoviePy -->|Final Video| YouTubeAPI[YouTube Data API v3]
-    Pillow -->|Thumbnail| YouTubeAPI
+    Pillow -->|YouTube thumbnail PNG| YouTubeAPI
     YouTubeAPI -->|Uploads| YouTube[YouTube]
 ```
 
