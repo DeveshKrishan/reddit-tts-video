@@ -1,7 +1,29 @@
+import sys
 import unittest
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+# CI installs only PyYAML and Pillow; stub heavy runtime deps before project imports.
+if "praw" not in sys.modules:
+    sys.modules["praw"] = MagicMock()
+
+if "stable_whisper" not in sys.modules:
+    sys.modules["stable_whisper"] = MagicMock()
+
+if "moviepy" not in sys.modules:
+    _moviepy = MagicMock()
+    _moviepy.AudioFileClip = MagicMock
+    _moviepy.CompositeVideoClip = MagicMock
+    _moviepy.ImageClip = MagicMock
+    _moviepy.VideoClip = MagicMock
+    _moviepy.VideoFileClip = MagicMock
+    _moviepy.concatenate_audioclips = MagicMock
+    _moviepy.vfx = MagicMock()
+    sys.modules["moviepy"] = _moviepy
+    _loop = MagicMock()
+    _loop.Loop = MagicMock
+    sys.modules["moviepy.video.fx.Loop"] = _loop
 
 from highlighted_subtitles import create_highlighted_subtitles_clip
 
