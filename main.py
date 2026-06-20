@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import fetch_content as fetch_content
 from config import load_config
 from logger import logger
-from resource_metrics import create_metrics_tracker
+from observability import create_metrics_tracker
 from text_utils import clean_post_text
 from tts import generate_tts
 from videoeditor import create_videos
@@ -20,7 +20,6 @@ def main() -> None:
     config = load_config()
     tts_config = config.get("tts", {})
     metrics = create_metrics_tracker(config.get("metrics", {}).get("enabled", True))
-    metrics.log_job_start()
 
     with metrics.track_phase("fetch_submissions"):
         submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
@@ -76,7 +75,7 @@ def main() -> None:
     job_end_str = job_end.strftime("%Y-%m-%dT%H:%M:%SZ")
     job_run_time = round((job_end - job_start).total_seconds(), 2)
     metrics.log_job_summary(
-        job_run_time_sec=job_run_time,
+        duration_sec=job_run_time,
         job_start_time=job_start_str,
         job_end_time=job_end_str,
         destination="YouTube",
