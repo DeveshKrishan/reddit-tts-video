@@ -1,10 +1,19 @@
+# Install both hook types: `pre-commit install` (or scripts/setup-pre-commit.sh).
+# commit-msg runs commitlint so body lines stay within the 100-char CI limit.
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
 repos:
 - repo: local
   hooks:
     - id: commitlint
       name: commitlint
-      entry: bash scripts/commitlint-msg.sh
-      language: system
+      entry: commitlint --config commitlint.config.cjs --edit
+      language: node
+      additional_dependencies:
+        - '@commitlint/cli@19.8.1'
+        - '@commitlint/config-conventional@19.8.1'
       stages: [commit-msg]
 
 - repo: https://github.com/astral-sh/ruff-pre-commit

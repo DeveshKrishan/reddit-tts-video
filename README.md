@@ -29,6 +29,22 @@ flowchart TD
 
 ---
 
+## Development
+
+Install git hooks once (ruff/mypy on commit, commitlint on commit message):
+
+```bash
+bash scripts/setup-pre-commit.sh
+```
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/); body lines must stay within **100 characters** (same rule as CI). To check commits on your branch before pushing:
+
+```bash
+bash scripts/validate-commits.sh
+```
+
+---
+
 ## 📺 Watch on YouTube
 
 [Visit TheDailyRedditor channel](https://www.youtube.com/@TheDailyRedditors)
