@@ -7,13 +7,14 @@ This folder owns **how the pipeline measures and reports itself**. Application c
 | File | Purpose |
 |------|---------|
 | `resource_metrics.py` | v1 process-tree metrics via `psutil` — phase timing, peak CPU %, peak memory MB / % |
+| `otel_export.py` | Optional OTLP push to Grafana Cloud — metrics, traces, logs |
+| `otel_tracker.py` | Wraps `ResourceMonitor` and forwards events to OTLP |
 | `README.md` | This doc — current format, config, and upgrade paths |
 
 Planned additions (not implemented yet):
 
 | File | Purpose |
 |------|---------|
-| `grafana_export.py` | Optional push to Grafana Cloud Loki + Prometheus remote write |
 | `alloy/` | Sample Grafana Alloy config to ship stdout logs without Python changes |
 
 ## Design principles
@@ -29,16 +30,33 @@ Planned additions (not implemented yet):
 # configs/youtube_config.yaml
 metrics:
   enabled: true   # false disables all resource_* JSON log lines
+  otel:
+    enabled: false  # true pushes metrics/traces/logs via OTLP when credentials are set
+    service_name: reddit-tts-video
+    export_metrics: true
+    export_traces: true
+    export_logs: true
 ```
+
+Env vars for Grafana Cloud (never commit):
+
+| Variable | Purpose |
+|----------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP gateway URL (e.g. `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`) |
+| `GRAFANA_CLOUD_OTEL_INSTANCE_ID` | Grafana Cloud stack instance ID |
+| `GRAFANA_CLOUD_API_KEY` | Grafana Cloud access policy token |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Auth header — Grafana often copies as `Authorization=Basic%20...` (URL-encoded); both forms work |
+| `OTEL_SERVICE_NAME` | Overrides `service_name` in config |
 
 Usage in `main.py`:
 
 ```python
-from observability import create_metrics_tracker
+from observability import create_metrics_tracker, shutdown_otel
 
-metrics = create_metrics_tracker(config.get("metrics", {}).get("enabled", True))
+metrics = create_metrics_tracker(config.get("metrics", {}))
 with metrics.track_phase("video_render", submission_id=submission.id):
     videos = create_videos(submission)
+# shutdown_otel() flushes pending OTLP batches at process exit
 ```
 
 ## Current log format (v1)
@@ -164,19 +182,48 @@ Env vars (never commit):
 
 ---
 
-### Option 4 — OpenTelemetry
+## OpenTelemetry export (Grafana Cloud)
 
-**Effort:** medium–high  
-**Cost:** Grafana Cloud OTLP endpoint or any OTEL backend
+**Status:** implemented in `otel_export.py`  
+**Effort:** medium  
+**Cost:** Grafana Cloud free tier OTLP endpoint
 
-Replace or wrap `ResourceMonitor` with OTEL spans:
+When `metrics.otel.enabled: true` and credentials are present, each run pushes:
 
-- One span per phase (`fetch_submissions`, `tts`, …)
-- Attributes: `duration_sec`, `max_cpu_percent`, `max_memory_mb`, `max_memory_percent`
-- Export via OTLP to Grafana Cloud or Jaeger
+| Signal | What gets exported |
+|--------|-------------------|
+| **Metrics** | Phase duration, peak CPU/memory, job duration, upload success/error counters, error counters |
+| **Traces** | One span per pipeline phase (`fetch_submissions`, `tts`, `video_render`, `youtube_upload`) |
+| **Logs** | All `logger` output via OTLP (stdout JSON metrics still emit locally) |
 
-**Pros:** Standard vendor-neutral model; traces + metrics together.  
-**Cons:** Heavier dependency; overkill until you need distributed tracing across services.
+### Metric names
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `reddit_tts.phase.duration` | histogram (s) | `phase`, `subreddit`, `part`, `total_parts` |
+| `reddit_tts.job.duration` | histogram (s) | `destination`, … |
+| `reddit_tts.video.uploads` | counter | `status` (`success` / `error`), `subreddit`, `error_type` |
+| `reddit_tts.errors` | counter | `phase`, `error_type`, … |
+| `process.cpu.utilization` | observable gauge (0–1) | `phase` — sampled every `resource_export_interval_sec` |
+| `process.memory.usage` | observable gauge (bytes) | `phase` |
+| `process.memory.utilization` | observable gauge (0–1) | `phase` |
+
+CPU and memory use **OpenTelemetry observable gauges** (OTEL semantic conventions). The SDK reads `psutil` on each export tick (default **1s**) and pushes a time series to Grafana — not just phase peaks. Phase-level peaks still appear in stdout JSON (`resource_phase` events) for local grep/CI.
+
+`submission_id` is kept on **traces and logs** only — not metric labels — to avoid Prometheus cardinality limits.
+
+### Grafana dashboard ideas
+
+- Time series: `process.cpu.utilization` by `phase` (1s resolution)
+- Time series: `process.memory.usage` / `process.memory.utilization` during `video_render`
+- Time series: p50/p95 `reddit_tts.phase.duration` by `phase`
+- Stat: `sum(reddit_tts.video.uploads{status="success"})` over 24h
+- Table: recent errors from `reddit_tts.errors` grouped by `error_type`
+- Trace search: `service.name="reddit-tts-video"` filtered by `phase`
+
+### Local dev
+
+Set `DEBUG = True` in `config.py` to disable OTEL export (and use development Reddit sources). With `DEBUG = False` and credentials in env, OTEL pushes to Grafana on each run.
 
 ---
 
@@ -224,9 +271,9 @@ In GitHub Actions, redirect stdout to a file and upload as an artifact. Review m
 | Step | Action |
 |------|--------|
 | **Now (v1)** | Structured JSON via `resource_metrics.py` ✅ |
-| **Next** | Alloy config in `observability/alloy/` + Grafana Cloud stack |
-| **Later** | Optional `grafana_export.py` for CI push |
-| **Future** | SQLite history + dashboards for regression tracking |
+| **Now (v1.1)** | OTLP export via `otel_export.py` ✅ |
+| **Next** | Alloy config in `observability/alloy/` + Grafana dashboards |
+| **Later** | SQLite history for regression tracking |
 
 ## Adding a new phase
 

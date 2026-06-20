@@ -2,32 +2,63 @@
 
 ## Project Description
 
-reddit-tts-video is an automated pipeline that fetches top Reddit posts, converts them to narrated videos with subtitles and custom thumbnails, and uploads them to YouTube. It leverages Python, gTTS, OpenAI Whisper, MoviePy, Pillow, and the YouTube Data API v3 to create engaging automated content from Reddit stories with minimal manual intervention.
+**Reddit TTS Video** is an automated pipeline that turns top Reddit posts into **YouTube Shorts** — vertical 9:16 videos with TTS narration, TikTok-style subtitles, a Reddit post-card intro thumbnail, and direct upload to YouTube.
+
+Built with Python, Edge TTS, OpenAI Whisper, MoviePy, and the YouTube Data API v3. In production, every run exports metrics, traces, and logs to **Grafana Cloud** via **OpenTelemetry**.
 
 [Demo of Example Video Generated](https://www.youtube.com/watch?v=ENCQAaIP8nE):
 
-
 ![YouTube Thumbnail of Reddit Post](assets/thumbnails/example_thumbnail_generated.png)
 
-## Application Process Overview
+## What it produces
 
-The following flowchart illustrates the end-to-end process, from fetching Reddit content to uploading the final video and thumbnail to YouTube:
+Each run fetches Reddit submissions and outputs **Shorts-ready** `.mov` files (1080×1920, up to 3 minutes). Long posts are split into multiple parts automatically.
+
+| Step | What happens |
+|------|----------------|
+| **Fetch** | Top posts from configured subreddits via PRAW |
+| **Narrate** | Edge TTS for title + body (`en-US-GuyNeural` by default) |
+| **Thumbnail intro** | `thumbnail.py` renders a Reddit-style post card (Pillow) and fades it in at the start of part 1 |
+| **Subtitles** | Whisper transcription, rechunked into short word bursts, burned into the video |
+| **Render** | MoviePy composes 9:16 footage, audio, SFX, and the intro card |
+| **Upload** | YouTube Data API with Shorts tags, `#Shorts`, and subreddit hashtags |
+
+## Pipeline overview
 
 ```mermaid
 flowchart TD
-    RedditAPI[Reddit API / PRAW] -->|Fetches posts| TTS[Edge TTS]
-    RedditAPI -->|Post data| ThumbnailCard[thumbnail.py]
-    RedditAPI -->|Post data| Pillow[Pillow]
-    TTS -->|Title + body MP3| Whisper[OpenAI Whisper]
-    TTS -->|Audio MP3| MoviePy[MoviePy]
-    ThumbnailCard -->|Post card overlay part 1| MoviePy
-    Whisper -->|Subtitles delayed past intro| MoviePy
-    MoviePy -->|Final Video| YouTubeAPI[YouTube Data API v3]
-    Pillow -->|YouTube thumbnail PNG| YouTubeAPI
-    YouTubeAPI -->|Uploads| YouTube[YouTube]
+    RedditAPI["Reddit API / PRAW"] -->|Fetches posts| TTS["Edge TTS"]
+    RedditAPI -->|Post data| ThumbnailCard["thumbnail.py"]
+    TTS -->|Title + body audio| Whisper["OpenAI Whisper"]
+    TTS -->|Audio| MoviePy["MoviePy (9:16 Shorts)"]
+    ThumbnailCard -->|Post card intro on part 1| MoviePy
+    Whisper -->|Subtitles| MoviePy
+    MoviePy -->|Final video| YouTubeAPI["YouTube Data API v3"]
+    MoviePy --> Metrics["observability / psutil"]
+    Metrics -->|OTLP| Grafana["Grafana Cloud"]
+    YouTubeAPI --> Shorts["YouTube Shorts"]
 ```
 
----
+## Observability (Grafana + OpenTelemetry)
+
+Production runs (`DEBUG = False`) always export to Grafana Cloud over OTLP. Each run also emits structured JSON metrics to stdout (phase duration, CPU, memory).
+
+![Grafana dashboard — Reddit TTS Video service overview](assets/images/grafana-dashboard.png)
+
+| Signal | Examples |
+|--------|----------|
+| **Metrics** | Phase duration, CPU/memory every 1s, upload success/errors |
+| **Traces** | One span per pipeline phase |
+| **Logs** | All pipeline logger output |
+
+OTEL is on by default in `configs/youtube_config.yaml` (`metrics.otel.enabled: true`). Production and CI need Grafana credentials in `.env` or GitHub Actions secrets (never commit keys):
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-<region>.grafana.net/otlp
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <token>
+```
+
+Set `DEBUG = True` in `config.py` only for local dev — that skips OTEL export and uses development Reddit sources. Full setup: [`observability/README.md`](observability/README.md).
 
 ## Development
 
@@ -41,6 +72,13 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ```bash
 bash scripts/validate-commits.sh
+```
+
+Run locally:
+
+```bash
+pip install -r requirements.txt
+python3 main.py
 ```
 
 ---

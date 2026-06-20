@@ -19,6 +19,65 @@ _SAMPLE_INTERVAL_SEC = 0.5
 
 
 @dataclass(frozen=True)
+class UtilizationSample:
+    """Instantaneous process-tree CPU and memory readings."""
+
+    cpu_utilization: float  # 0.0–1.0 fraction of logical CPU capacity
+    memory_bytes: int
+    memory_utilization: float  # 0.0–1.0 fraction of system RAM
+
+
+class ProcessUtilizationReader:
+    """Reads current CPU/memory for the process tree; used by OTEL observable gauges."""
+
+    def __init__(self, process: psutil.Process | None = None) -> None:
+        self._process = process or psutil.Process(os.getpid())
+        self._lock = threading.Lock()
+        self._last_cpu_seconds: float | None = None
+        self._last_wall_time: float | None = None
+        self._active_phase = "startup"
+
+    @property
+    def active_phase(self) -> str:
+        with self._lock:
+            return self._active_phase
+
+    def set_active_phase(self, phase: str) -> None:
+        with self._lock:
+            self._active_phase = phase
+
+    def observe(self) -> UtilizationSample:
+        with self._lock:
+            now = time.perf_counter()
+            cpu_seconds = _aggregate_cpu_seconds(self._process)
+            rss_bytes = _aggregate_rss(self._process)
+
+            cpu_utilization = 0.0
+            if self._last_cpu_seconds is not None and self._last_wall_time is not None:
+                interval = now - self._last_wall_time
+                if interval > 0:
+                    cpu_utilization = (
+                        _cpu_rate_percent(
+                            cpu_seconds - self._last_cpu_seconds,
+                            interval,
+                        )
+                        / 100.0
+                    )
+
+            self._last_cpu_seconds = cpu_seconds
+            self._last_wall_time = now
+
+            total_ram = psutil.virtual_memory().total
+            memory_utilization = (rss_bytes / total_ram) if total_ram > 0 else 0.0
+
+            return UtilizationSample(
+                cpu_utilization=round(cpu_utilization, 4),
+                memory_bytes=rss_bytes,
+                memory_utilization=round(memory_utilization, 4),
+            )
+
+
+@dataclass(frozen=True)
 class ProcessSnapshot:
     wall_time: float
     rss_bytes: int
@@ -202,5 +261,24 @@ class NullMetricsTracker:
         yield
 
 
-def create_metrics_tracker(enabled: bool = True) -> MetricsTracker:
-    return ResourceMonitor() if enabled else NullMetricsTracker()
+def create_metrics_tracker(metrics_config: dict[str, Any] | bool | None = None) -> MetricsTracker:
+    if isinstance(metrics_config, bool):
+        enabled = metrics_config
+        otel_config: dict[str, Any] = {}
+    elif metrics_config is None:
+        enabled = True
+        otel_config = {}
+    else:
+        enabled = bool(metrics_config.get("enabled", True))
+        otel_config = metrics_config.get("otel", {}) or {}
+
+    if not enabled:
+        return NullMetricsTracker()
+
+    from observability.otel_export import setup_otel
+    from observability.otel_tracker import OtelResourceMonitor
+
+    otel = setup_otel(otel_config)
+    if otel is not None:
+        return OtelResourceMonitor(otel)
+    return ResourceMonitor()
