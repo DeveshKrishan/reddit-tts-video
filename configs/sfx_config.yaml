@@ -14,7 +14,7 @@ intro:
 # Volume should be low (0.10–0.20) so it never competes with the spoken audio.
 background_music:
   enabled: true
-  file: "assets/sfx/Shining (feat. Leon Albertson & Adryon de León) - Leon Albertson feat. Adryon de León.mp3"
+  file: "assets/sfx/On The Eve - The Grey Room _ Density & Time.mp3"
   volume: 0.07
 
 # Paths to royalty-free SFX files (download from YouTube Audio Library).
