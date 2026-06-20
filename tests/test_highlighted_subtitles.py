@@ -3,11 +3,20 @@ import unittest
 from highlighted_subtitles import (
     POP_PADDING,
     _display_word,
+    _line_width_for_words,
+    _load_font,
     _pad_image_to_height,
     _rechunk_words,
     render_highlighted_text,
     segment_words,
 )
+
+MAX_WIDTH = 920
+FONT_SIZE = 72
+
+
+def _rechunk(segment_words_list, max_words=4, max_width=MAX_WIDTH, font_size=FONT_SIZE):
+    return _rechunk_words(segment_words_list, max_words, max_width, font_size)
 
 
 def _word(text: str, start: float, end: float) -> dict:
@@ -20,18 +29,18 @@ def _segment(text: str, start: float, end: float, words: list[dict] | None = Non
 
 class TestRechunkWords(unittest.TestCase):
     def test_empty_input_returns_empty(self) -> None:
-        self.assertEqual(_rechunk_words([], 4), [])
+        self.assertEqual(_rechunk([]), [])
 
     def test_fewer_words_than_group_size(self) -> None:
         segment_words_list = [(_segment("hello world", 0.0, 1.0), [_word("hello", 0.0, 0.5), _word("world", 0.5, 1.0)])]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual(len(groups), 1)
         self.assertEqual([w["word"] for w in groups[0]], ["hello", "world"])
 
     def test_exact_multiple_of_group_size(self) -> None:
         words = [_word(f"w{i}", float(i), float(i + 1)) for i in range(8)]
         segment_words_list = [(_segment(" ".join(w["word"] for w in words), 0.0, 8.0), words)]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual(len(groups), 2)
         self.assertEqual(len(groups[0]), 4)
         self.assertEqual(len(groups[1]), 4)
@@ -39,7 +48,7 @@ class TestRechunkWords(unittest.TestCase):
     def test_remainder_creates_final_short_group(self) -> None:
         words = [_word(f"w{i}", float(i), float(i + 1)) for i in range(5)]
         segment_words_list = [(_segment("five words", 0.0, 5.0), words)]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual(len(groups), 2)
         self.assertEqual(len(groups[0]), 4)
         self.assertEqual(len(groups[1]), 1)
@@ -52,7 +61,7 @@ class TestRechunkWords(unittest.TestCase):
                 [_word("three", 2.0, 3.0), _word("four", 3.0, 4.0), _word("five", 4.0, 5.0)],
             ),
         ]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual(len(groups), 2)
         self.assertEqual([w["word"] for w in groups[0]], ["one", "two", "three", "four"])
         self.assertEqual([w["word"] for w in groups[1]], ["five"])
@@ -60,7 +69,7 @@ class TestRechunkWords(unittest.TestCase):
     def test_preserves_word_timing_dicts(self) -> None:
         original = _word("hello", 1.0, 1.5)
         segment_words_list = [(_segment("hello", 1.0, 1.5), [original])]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertIs(groups[0][0], original)
 
     def test_does_not_span_sentence_boundaries(self) -> None:
@@ -71,7 +80,7 @@ class TestRechunkWords(unittest.TestCase):
             _word("crazy", 0.9, 1.2),
         ]
         segment_words_list = [(_segment("believe it. it's crazy", 0.0, 1.2), words)]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual(len(groups), 2)
         self.assertEqual([w["word"] for w in groups[0]], ["believe", "it."])
         self.assertEqual([w["word"] for w in groups[1]], ["it's", "crazy"])
@@ -86,10 +95,25 @@ class TestRechunkWords(unittest.TestCase):
             _word("six", 1.0, 1.2),
         ]
         segment_words_list = [(_segment("one two three four five. six", 0.0, 1.2), words)]
-        groups = _rechunk_words(segment_words_list, 4)
+        groups = _rechunk(segment_words_list)
         self.assertEqual([w["word"] for w in groups[0]], ["one", "two", "three", "four"])
         self.assertEqual([w["word"] for w in groups[1]], ["five."])
         self.assertEqual([w["word"] for w in groups[2]], ["six"])
+
+    def test_splits_wide_groups_to_avoid_clipping(self) -> None:
+        words = [
+            _word("tremendous", 0.0, 0.3),
+            _word("acting", 0.3, 0.6),
+            _word("and", 0.6, 0.9),
+            _word("cutscenes", 0.9, 1.2),
+        ]
+        segment_words_list = [(_segment("tremendous acting and cutscenes", 0.0, 1.2), words)]
+        groups = _rechunk(segment_words_list, max_width=500)
+        self.assertGreater(len(groups), 1)
+        font = _load_font(FONT_SIZE)
+        for group in groups:
+            display = [_display_word(w["word"]) for w in group]
+            self.assertLessEqual(_line_width_for_words(display, font), 500)
 
 
 class TestDisplayWord(unittest.TestCase):
@@ -146,6 +170,19 @@ class TestRenderHighlightedText(unittest.TestCase):
         self.assertGreater(w, 0)
         self.assertGreater(h, 0)
         self.assertGreaterEqual(y, 0)
+
+    def test_renders_all_words_on_one_line(self) -> None:
+        words = ["make", "stealth", "unusable", "the"]
+        multi, _ = render_highlighted_text(words, None, font_size=72, max_width=MAX_WIDTH)
+        single, _ = render_highlighted_text(["make"], None, font_size=72, max_width=MAX_WIDTH)
+        self.assertLess(multi.height, single.height * 2)
+
+    def test_long_line_shrinks_font_to_fit_canvas(self) -> None:
+        words = ["tremendous", "cutscenes"]
+        image, _ = render_highlighted_text(words, None, font_size=72, max_width=400)
+        single_at_72, _ = render_highlighted_text(["tremendous"], None, font_size=72, max_width=920)
+        # Shrunken group should still fit without needing double the line height.
+        self.assertLessEqual(image.height, single_at_72.height * 2)
 
 
 if __name__ == "__main__":
