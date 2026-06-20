@@ -11,7 +11,7 @@ FONT_PATH = "assets/fonts/Poppins-Medium.ttf"
 HIGHLIGHT_COLOR = "#39FF14"
 TEXT_COLOR = "white"
 STROKE_COLOR = "black"
-STROKE_WIDTH = 4
+STROKE_WIDTH = 10
 LINE_SPACING = 8
 # Extra pixels added between words on top of a normal space, giving the pop
 # animation room to expand without clipping into adjacent words.
@@ -25,6 +25,16 @@ POP_RAMP_FRACTION = 0.2
 # scale animation never clips the top of the first line or the bottom of the
 # last line. Also absorbs font ascenders that sit above the baseline (bbox[1] < 0).
 POP_PADDING = 12
+
+# Punctuation stripped for on-screen captions (TikTok-style). Sentence chunking
+# still uses the raw Whisper words so boundaries like "it." / "it's" stay intact.
+_DISPLAY_STRIP = str.maketrans("", "", ".,;:\"'`")
+
+
+def _display_word(word: str) -> str:
+    """Return a caption-safe word with most punctuation removed (? and ! kept)."""
+    cleaned = word.translate(_DISPLAY_STRIP)
+    return cleaned or word
 
 
 def _load_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -192,22 +202,57 @@ def render_highlighted_text(
     return image, highlighted_word_bbox
 
 
+def _pad_image_to_height(
+    image: Image.Image,
+    word_bbox: tuple[int, int, int, int] | None,
+    target_h: int,
+) -> tuple[Image.Image, tuple[int, int, int, int] | None]:
+    """Pad a rendered subtitle image to a fixed height, vertically centered."""
+    if image.height >= target_h:
+        return image, word_bbox
+    padded = Image.new("RGBA", (image.width, target_h), (0, 0, 0, 0))
+    offset_y = (target_h - image.height) // 2
+    padded.paste(image, (0, offset_y), image)
+    if word_bbox is None:
+        return padded, None
+    x, y, w, h = word_bbox
+    return padded, (x, y + offset_y, w, h)
+
+
+def _ends_sentence(word: str) -> bool:
+    return bool(word) and word[-1] in ".!?"
+
+
+def _split_into_sentences(flat: list[dict]) -> list[list[dict]]:
+    """Split a flat word list into sentence-sized groups using trailing punctuation."""
+    sentences: list[list[dict]] = []
+    current: list[dict] = []
+    for word_info in flat:
+        current.append(word_info)
+        if _ends_sentence(word_info["word"]):
+            sentences.append(current)
+            current = []
+    if current:
+        sentences.append(current)
+    return sentences
+
+
 def _rechunk_words(
     segment_words_list: list[tuple[dict, list[dict]]],
     max_words_per_group: int,
 ) -> list[list[dict]]:
-    """Flatten all Whisper word dicts and rechunk into fixed-size groups.
+    """Flatten Whisper word dicts and rechunk into on-screen groups.
 
-    Each group is shown on screen simultaneously, replacing the full-segment
-    display. Smaller groups (3–4 words) create the TikTok-style caption effect
-    that keeps viewers engaged.
+    Groups never span sentence boundaries (e.g. "believe it." and "it's" stay
+    separate). Within each sentence, groups are capped at `max_words_per_group`.
     """
     flat = [w for _, words in segment_words_list for w in words]
     groups: list[list[dict]] = []
-    for i in range(0, len(flat), max_words_per_group):
-        chunk = flat[i : i + max_words_per_group]
-        if chunk:
-            groups.append(chunk)
+    for sentence in _split_into_sentences(flat):
+        for i in range(0, len(sentence), max_words_per_group):
+            chunk = sentence[i : i + max_words_per_group]
+            if chunk:
+                groups.append(chunk)
     return groups
 
 
@@ -239,7 +284,7 @@ def create_highlighted_subtitles_clip(
     # Cache: (group_index, highlight_index | None) → (image, highlighted_word_bbox)
     render_cache: dict[tuple[int, int | None], tuple[Image.Image, tuple[int, int, int, int] | None]] = {}
     for group_index, group in enumerate(word_groups):
-        word_text = [w["word"] for w in group]
+        word_text = [_display_word(w["word"]) for w in group]
         render_cache[(group_index, None)] = render_highlighted_text(word_text, None, font_size, max_text_width)
         for highlight_index in range(len(group)):
             render_cache[(group_index, highlight_index)] = render_highlighted_text(
@@ -272,6 +317,12 @@ def create_highlighted_subtitles_clip(
                 return group_index, highlight_index
         return None
 
+    # Normalize every frame to the same height so vertical centering on the
+    # video frame stays correct even when some groups wrap to more lines.
+    max_subtitle_h = max((img.height for (img, _) in render_cache.values()), default=1)
+    for key, (image, bbox) in list(render_cache.items()):
+        render_cache[key] = _pad_image_to_height(image, bbox, max_subtitle_h)
+
     def _animated_image(state: tuple[int, int | None], t: float) -> Image.Image:
         """Return the subtitle image with the pop animation applied for time t."""
         image, word_bbox = render_cache[state]
@@ -293,21 +344,16 @@ def create_highlighted_subtitles_clip(
     def frame_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
-            return np.zeros((1, max_text_width, 3), dtype=np.uint8)
+            return np.zeros((max_subtitle_h, max_text_width, 3), dtype=np.uint8)
         return np.array(_animated_image(state, t).convert("RGB"))
 
     def mask_function(t: float) -> np.ndarray:
         state = active_state(t)
         if state is None:
-            return np.zeros((1, max_text_width), dtype=float)
+            return np.zeros((max_subtitle_h, max_text_width), dtype=float)
         alpha = np.array(_animated_image(state, t).split()[-1], dtype=float) / 255.0
         return alpha
 
-    # Pre-compute the maximum rendered height across all cached frames so the
-    # caller can anchor the subtitle block's BOTTOM edge (not the top) at a
-    # fixed position above the YouTube Shorts UI buttons.
-    max_subtitle_h = max((img.height for (img, _) in render_cache.values()), default=1)
-
-    clip = VideoClip(frame_function, duration=duration, has_constant_size=False)
-    mask = VideoClip(mask_function, is_mask=True, duration=duration, has_constant_size=False)
+    clip = VideoClip(frame_function, duration=duration, has_constant_size=True)
+    mask = VideoClip(mask_function, is_mask=True, duration=duration, has_constant_size=True)
     return clip.with_mask(mask), max_subtitle_h

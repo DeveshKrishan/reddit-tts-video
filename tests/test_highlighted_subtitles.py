@@ -2,6 +2,8 @@ import unittest
 
 from highlighted_subtitles import (
     POP_PADDING,
+    _display_word,
+    _pad_image_to_height,
     _rechunk_words,
     render_highlighted_text,
     segment_words,
@@ -61,6 +63,47 @@ class TestRechunkWords(unittest.TestCase):
         groups = _rechunk_words(segment_words_list, 4)
         self.assertIs(groups[0][0], original)
 
+    def test_does_not_span_sentence_boundaries(self) -> None:
+        words = [
+            _word("believe", 0.0, 0.3),
+            _word("it.", 0.3, 0.6),
+            _word("it's", 0.6, 0.9),
+            _word("crazy", 0.9, 1.2),
+        ]
+        segment_words_list = [(_segment("believe it. it's crazy", 0.0, 1.2), words)]
+        groups = _rechunk_words(segment_words_list, 4)
+        self.assertEqual(len(groups), 2)
+        self.assertEqual([w["word"] for w in groups[0]], ["believe", "it."])
+        self.assertEqual([w["word"] for w in groups[1]], ["it's", "crazy"])
+
+    def test_long_sentence_splits_at_max_words_without_crossing_sentences(self) -> None:
+        words = [
+            _word("one", 0.0, 0.2),
+            _word("two", 0.2, 0.4),
+            _word("three", 0.4, 0.6),
+            _word("four", 0.6, 0.8),
+            _word("five.", 0.8, 1.0),
+            _word("six", 1.0, 1.2),
+        ]
+        segment_words_list = [(_segment("one two three four five. six", 0.0, 1.2), words)]
+        groups = _rechunk_words(segment_words_list, 4)
+        self.assertEqual([w["word"] for w in groups[0]], ["one", "two", "three", "four"])
+        self.assertEqual([w["word"] for w in groups[1]], ["five."])
+        self.assertEqual([w["word"] for w in groups[2]], ["six"])
+
+
+class TestDisplayWord(unittest.TestCase):
+    def test_strips_periods_and_commas(self) -> None:
+        self.assertEqual(_display_word("unusable,"), "unusable")
+        self.assertEqual(_display_word("it."), "it")
+
+    def test_keeps_question_and_exclamation_marks(self) -> None:
+        self.assertEqual(_display_word("what?"), "what?")
+        self.assertEqual(_display_word("no!"), "no!")
+
+    def test_strips_apostrophes_from_contractions(self) -> None:
+        self.assertEqual(_display_word("it's"), "its")
+
 
 class TestSegmentWords(unittest.TestCase):
     def test_normalizes_whisper_words(self) -> None:
@@ -86,6 +129,15 @@ class TestRenderHighlightedText(unittest.TestCase):
         image, _ = render_highlighted_text(["hello", "world"], None, font_size=72, max_width=920)
         # Without POP_PADDING the canvas would be shorter; padding adds 2 * POP_PADDING px.
         self.assertGreaterEqual(image.height, 2 * POP_PADDING)
+
+    def test_pad_image_to_height_centers_shorter_canvas(self) -> None:
+        image, bbox = render_highlighted_text(["hello"], 0, font_size=72, max_width=920)
+        target_h = image.height + 40
+        padded, padded_bbox = _pad_image_to_height(image, bbox, target_h)
+        self.assertEqual(padded.height, target_h)
+        self.assertIsNotNone(padded_bbox)
+        assert padded_bbox is not None and bbox is not None
+        self.assertEqual(padded_bbox[1], bbox[1] + 20)
 
     def test_highlighted_word_gets_bbox(self) -> None:
         _, bbox = render_highlighted_text(["one", "two", "three"], highlight_index=1, font_size=72, max_width=920)
