@@ -1,10 +1,12 @@
 import os
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
+
 import fetch_content as fetch_content
 from config import load_config
 from logger import logger
-from observability import create_metrics_tracker
+from observability import create_metrics_tracker, shutdown_otel
 from text_utils import clean_post_text
 from tts import generate_tts
 from videoeditor import create_videos
@@ -14,12 +16,14 @@ OUTPUT_FOLDER = "assets/audio"
 
 
 def main() -> None:
+    load_dotenv(override=True)
+
     job_start = datetime.now(timezone.utc)
     job_start_str = job_start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     config = load_config()
     tts_config = config.get("tts", {})
-    metrics = create_metrics_tracker(config.get("metrics", {}).get("enabled", True))
+    metrics = create_metrics_tracker(config.get("metrics", {}))
 
     with metrics.track_phase("fetch_submissions"):
         submissions = fetch_content.fetch_submissions(fetch_content.create_password_flow_with_praw())
@@ -84,4 +88,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        shutdown_otel()

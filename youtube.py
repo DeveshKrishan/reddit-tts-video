@@ -10,6 +10,7 @@ from googleapiclient.http import MediaFileUpload
 
 from config import DEBUG, load_config
 from logger import logger
+from observability import record_video_upload_error, record_video_upload_success
 
 # Keyword → YouTube search tags mapping.
 # Keys are words to detect in the post title (lowercase); values are tags to emit.
@@ -320,7 +321,29 @@ def upload_video(
                 logger.info(f"Uploaded {int(status.progress() * 100)}%...")
         logger.info("Upload complete!")
         logger.info(f"Video ID: {response['id']}")
+        record_video_upload_success(
+            submission_id=submission.id,
+            subreddit=str(submission.subreddit),
+            part=part,
+            total_parts=total_parts,
+        )
 
     except RefreshError as exc:
+        record_video_upload_error(
+            "RefreshError",
+            submission_id=submission.id,
+            subreddit=str(submission.subreddit),
+            part=part,
+            total_parts=total_parts,
+        )
         logger.error(REFRESH_TOKEN_HELP)
         raise RefreshError(f"{exc}. {REFRESH_TOKEN_HELP}") from exc
+    except Exception as exc:
+        record_video_upload_error(
+            type(exc).__name__,
+            submission_id=submission.id,
+            subreddit=str(submission.subreddit),
+            part=part,
+            total_parts=total_parts,
+        )
+        raise

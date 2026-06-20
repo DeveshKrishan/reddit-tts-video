@@ -81,3 +81,13 @@ tts:
 # Process-level CPU and memory metrics (psutil). Emits one JSON object per log line.
 metrics:
   enabled: true
+  # Optional OpenTelemetry export to Grafana Cloud (or any OTLP backend).
+  # Credentials via env — never commit keys. See observability/README.md.
+  otel:
+    enabled: false
+    # endpoint: https://otlp-gateway-prod-us-central-0.grafana.net/otlp
+    service_name: reddit-tts-video
+    export_metrics: true
+    export_traces: true
+    export_logs: true
+    resource_export_interval_sec: 1  # CPU/memory observable gauge + OTLP push interval
