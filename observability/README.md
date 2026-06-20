@@ -6,7 +6,7 @@ This folder owns **how the pipeline measures and reports itself**. Application c
 
 | File | Purpose |
 |------|---------|
-| `resource_metrics.py` | v1 process metrics via `psutil` — phase timing, CPU %, memory MB / % |
+| `resource_metrics.py` | v1 process-tree metrics via `psutil` — phase timing, peak CPU %, peak memory MB / % |
 | `README.md` | This doc — current format, config, and upgrade paths |
 
 Planned additions (not implemented yet):
@@ -57,9 +57,11 @@ Logger prefix is unchanged (`YYYY-MM-DD HH:MM:SS UTC - INFO -`). The message bod
 | Field | Meaning |
 |-------|---------|
 | `duration_sec` | Wall-clock time for the phase |
-| `cpu_percent` | Average CPU use during the phase (can exceed 100% on multi-core) |
-| `memory_mb` | Process RSS in MB at end of phase |
-| `memory_percent` | RSS as % of total system RAM |
+| `max_cpu_percent` | Peak CPU use during the phase (process + child processes; can exceed 100% on multi-core) |
+| `max_memory_mb` | Peak RSS in MB during the phase (process + child processes) |
+| `max_memory_percent` | Peak RSS as % of total system RAM |
+
+Sampling runs every 0.5s in a background thread while the phase is active, plus start/end snapshots so short phases are still covered.
 
 Optional labels: `phase`, `submission_id`, `part`, `total_parts`.
 
@@ -75,11 +77,11 @@ Optional labels: `phase`, `submission_id`, `part`, `total_parts`.
 ### Example
 
 ```
-2026-06-20 12:04:55 UTC - INFO - {"event":"resource_phase","phase":"video_render","submission_id":"abc123","duration_sec":277.441,"cpu_percent":115.42,"memory_mb":1842.17,"memory_percent":11.3}
-2026-06-20 12:05:40 UTC - INFO - {"event":"resource_job_summary","duration_sec":340.12,"cpu_percent":48.5,"memory_mb":1842.17,"memory_percent":11.3,"job_start_time":"2026-06-20T12:00:00Z","job_end_time":"2026-06-20T12:05:40Z","destination":"YouTube","submissions_processed":1}
+2026-06-20 12:04:55 UTC - INFO - {"event":"resource_phase","phase":"video_render","submission_id":"abc123","duration_sec":277.441,"max_cpu_percent":115.42,"max_memory_mb":1842.17,"max_memory_percent":11.3}
+2026-06-20 12:05:40 UTC - INFO - {"event":"resource_job_summary","duration_sec":340.12,"max_cpu_percent":115.42,"max_memory_mb":1842.17,"max_memory_percent":11.3,"job_start_time":"2026-06-20T12:00:00Z","job_end_time":"2026-06-20T12:05:40Z","destination":"YouTube","submissions_processed":1}
 ```
 
-Job summary uses the same four core metrics; `memory_mb` / `memory_percent` reflect **peak** RSS for the run.
+Job summary uses the same fields; `max_*` values are the highest peaks seen across the full run.
 
 ---
 
@@ -126,7 +128,7 @@ Run [Grafana Alloy](https://grafana.com/docs/alloy/latest/) on the host that exe
 **Dashboard ideas:**
 
 - Bar chart: `duration_sec` by `phase`
-- Stat panel: max `memory_mb` where `phase="video_render"`
+- Stat panel: `max_memory_mb` where `phase="video_render"`
 - Table: last run's `resource_job_summary`
 
 ---
@@ -146,9 +148,9 @@ Add `observability/grafana_export.py` that reads the same four fields and pushes
 Suggested metric names:
 
 - `reddit_tts_phase_duration_seconds{phase,submission_id}`
-- `reddit_tts_phase_cpu_percent{phase}`
-- `reddit_tts_phase_memory_mb{phase}`
-- `reddit_tts_phase_memory_percent{phase}`
+- `reddit_tts_phase_max_cpu_percent{phase}`
+- `reddit_tts_phase_max_memory_mb{phase}`
+- `reddit_tts_phase_max_memory_percent{phase}`
 
 Env vars (never commit):
 
@@ -170,7 +172,7 @@ Env vars (never commit):
 Replace or wrap `ResourceMonitor` with OTEL spans:
 
 - One span per phase (`fetch_submissions`, `tts`, …)
-- Attributes: `duration_sec`, `cpu_percent`, `memory_mb`, `memory_percent`
+- Attributes: `duration_sec`, `max_cpu_percent`, `max_memory_mb`, `max_memory_percent`
 - Export via OTLP to Grafana Cloud or Jaeger
 
 **Pros:** Standard vendor-neutral model; traces + metrics together.  
@@ -196,9 +198,9 @@ CREATE TABLE phase_metrics (
   phase TEXT,
   submission_id TEXT,
   duration_sec REAL,
-  cpu_percent REAL,
-  memory_mb REAL,
-  memory_percent REAL,
+  max_cpu_percent REAL,
+  max_memory_mb REAL,
+  max_memory_percent REAL,
   recorded_at TEXT
 );
 ```
