@@ -57,6 +57,14 @@ class TestOtelExport(unittest.TestCase):
     def test_setup_otel_disabled_returns_none(self) -> None:
         self.assertIsNone(setup_otel({"enabled": False}))
 
+    @patch("config.DEBUG", True)
+    def test_setup_otel_skipped_when_debug_true(self) -> None:
+        with patch("observability.otel_export.logger") as mock_logger:
+            result = setup_otel({"enabled": True})
+        self.assertIsNone(result)
+        mock_logger.info.assert_called_once_with("OpenTelemetry export disabled (DEBUG=True)")
+
+    @patch("config.DEBUG", False)
     @patch("observability.otel_export._OTEL_AVAILABLE", False)
     def test_setup_otel_missing_packages(self) -> None:
         with patch("observability.otel_export.logger") as mock_logger:
@@ -64,12 +72,14 @@ class TestOtelExport(unittest.TestCase):
         self.assertIsNone(result)
         mock_logger.warning.assert_called_once()
 
+    @patch("config.DEBUG", False)
     def test_setup_otel_missing_endpoint(self) -> None:
         with patch("observability.otel_export.logger") as mock_logger:
             result = setup_otel({"enabled": True})
         self.assertIsNone(result)
         mock_logger.warning.assert_called_once()
 
+    @patch("config.DEBUG", False)
     @patch("observability.otel_export._OTEL_AVAILABLE", True)
     @patch("observability.otel_export.PipelineOtel")
     def test_setup_otel_success(self, mock_pipeline: MagicMock) -> None:
@@ -90,6 +100,7 @@ class TestOtelExport(unittest.TestCase):
         record_video_upload_success(submission_id="abc")
         record_video_upload_error("ValueError", submission_id="abc")
 
+    @patch("config.DEBUG", False)
     def test_setup_otel_missing_headers(self) -> None:
         with (
             patch.dict(os.environ, {"OTEL_EXPORTER_OTLP_ENDPOINT": "https://example.com/otlp"}, clear=False),

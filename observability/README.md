@@ -223,7 +223,7 @@ CPU and memory use **OpenTelemetry observable gauges** (OTEL semantic convention
 
 ### Local dev
 
-Keep `metrics.otel.enabled: false` (default). Stdout JSON metrics still work with zero cloud dependencies.
+Set `DEBUG = True` in `config.py` to disable OTEL export (and use development Reddit sources). With `DEBUG = False` and credentials in env, OTEL pushes to Grafana on each run.
 
 ---
 

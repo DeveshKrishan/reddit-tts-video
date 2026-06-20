@@ -84,7 +84,7 @@ metrics:
   # Optional OpenTelemetry export to Grafana Cloud (or any OTLP backend).
   # Credentials via env — never commit keys. See observability/README.md.
   otel:
-    enabled: false
+    enabled: true
     # endpoint: https://otlp-gateway-prod-us-central-0.grafana.net/otlp
     service_name: reddit-tts-video
     export_metrics: true

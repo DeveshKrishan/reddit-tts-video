@@ -335,6 +335,12 @@ def setup_otel(config: dict[str, Any] | None) -> PipelineOtel | None:
     if not otel_config.get("enabled", False):
         return None
 
+    from config import DEBUG
+
+    if DEBUG:
+        logger.info("OpenTelemetry export disabled (DEBUG=True)")
+        return None
+
     if not _OTEL_AVAILABLE:
         logger.warning("metrics.otel.enabled is true but OpenTelemetry packages are not installed")
         return None
