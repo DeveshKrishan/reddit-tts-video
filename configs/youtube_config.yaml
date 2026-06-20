@@ -77,3 +77,7 @@ tts:
   voice: en-US-GuyNeural
   rate: "+10%"
   pitch: "+0Hz"
+
+# Process-level CPU and memory metrics (psutil). Emits one JSON object per log line.
+metrics:
+  enabled: true
