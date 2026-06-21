@@ -15,7 +15,7 @@ intro:
 background_music:
   enabled: true
   file: "assets/sfx/On The Eve - The Grey Room _ Density & Time.mp3"
-  volume: 0.07
+  volume: 0.05
 
 # Paths to royalty-free SFX files (download from YouTube Audio Library).
 # Files are gitignored — add them locally under assets/sfx/.
