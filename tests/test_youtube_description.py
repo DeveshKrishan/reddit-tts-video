@@ -80,3 +80,18 @@ class TestYouTubeDescription(unittest.TestCase):
         description = _build_description(submission, add_shorts_hashtag=True)
 
         self.assertTrue(description.endswith("#Shorts"))
+
+    def test_part_one_includes_next_part_link(self) -> None:
+        submission = self._submission()
+
+        description = _build_description(
+            submission,
+            part=1,
+            total_parts=2,
+            tags=["reddit"],
+            next_part_url="https://youtube.com/watch?v=abc123xyz",
+            next_part=2,
+        )
+
+        self.assertTrue(description.startswith("Part 1 of 2\n\nWatch Part 2:\nhttps://youtube.com/watch?v=abc123xyz"))
+        self.assertIn("#reddit", description)

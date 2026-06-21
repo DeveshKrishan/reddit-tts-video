@@ -164,6 +164,10 @@ def _build_tags(
     return result
 
 
+def _youtube_watch_url(video_id: str) -> str:
+    return f"https://youtube.com/watch?v={video_id}"
+
+
 def _build_description(
     submission: praw.models.Submission,
     *,
@@ -171,6 +175,8 @@ def _build_description(
     total_parts: int | None = None,
     tags: list[str] | None = None,
     add_shorts_hashtag: bool = False,
+    next_part_url: str | None = None,
+    next_part: int | None = None,
 ) -> str:
     """Build the YouTube upload description.
 
@@ -189,17 +195,24 @@ def _build_description(
         "If you enjoyed this video, please like, comment, and subscribe for more Reddit stories!",
         "Share with your friends and let us know your thoughts below.",
     ]
-    description = "\n".join(lines)
-
-    if part and total_parts and total_parts > 1:
-        description = f"Part {part} of {total_parts}\n\n{description}"
+    body = "\n".join(lines)
 
     if tags:
-        description += "\n\n" + " ".join(f"#{t}" for t in tags)
+        body += "\n\n" + " ".join(f"#{t}" for t in tags)
     elif add_shorts_hashtag:
-        description += "\n\n#Shorts"
+        body += "\n\n#Shorts"
 
-    return description
+    prefix_lines: list[str] = []
+    if part and total_parts and total_parts > 1:
+        prefix_lines.append(f"Part {part} of {total_parts}")
+    if next_part_url and next_part:
+        if prefix_lines:
+            prefix_lines.append("")
+        prefix_lines.extend([f"Watch Part {next_part}:", next_part_url])
+
+    if prefix_lines:
+        return "\n\n".join(["\n".join(prefix_lines), body])
+    return body
 
 
 REFRESH_TOKEN_HELP = (
@@ -240,12 +253,80 @@ def get_credentials(scopes: list[str]) -> Credentials:
     )
 
 
+def _description_kwargs(
+    *,
+    part: int | None,
+    total_parts: int | None,
+    tags: list[str],
+    shorts_config: dict,
+    next_part_url: str | None = None,
+    next_part: int | None = None,
+) -> dict:
+    return {
+        "part": part,
+        "total_parts": total_parts,
+        "tags": tags,
+        "add_shorts_hashtag": bool(
+            not tags and shorts_config.get("enabled") and shorts_config.get("add_hashtag", True)
+        ),
+        "next_part_url": next_part_url,
+        "next_part": next_part,
+    }
+
+
+def _update_video_description(youtube, video_id: str, description: str) -> None:
+    response = youtube.videos().list(part="snippet", id=video_id).execute()
+    items = response.get("items", [])
+    if not items:
+        logger.warning(f"Could not fetch video {video_id} to update description.")
+        return
+
+    snippet = items[0]["snippet"]
+    snippet["description"] = description
+    youtube.videos().update(part="snippet", body={"id": video_id, "snippet": snippet}).execute()
+    logger.info(f"Updated description for video {video_id} with next-part link.")
+
+
+def link_next_part_in_description(
+    submission: praw.models.Submission,
+    *,
+    video_id: str,
+    part: int,
+    total_parts: int,
+    next_video_id: str,
+    next_part: int,
+    youtube,
+) -> None:
+    """Patch an earlier part's description after the next part has been uploaded."""
+    config = load_config()
+    tags = _build_tags(submission, config.get("tags", {}))
+    description = _build_description(
+        submission,
+        **_description_kwargs(
+            part=part,
+            total_parts=total_parts,
+            tags=tags,
+            shorts_config=config.get("shorts", {}),
+            next_part_url=_youtube_watch_url(next_video_id),
+            next_part=next_part,
+        ),
+    )
+    try:
+        _update_video_description(youtube, video_id, description)
+    except Exception as exc:
+        logger.error(
+            f"Failed to add Part {next_part} link to video {video_id}: {exc}. "
+            "Earlier part uploaded without a next-part link."
+        )
+
+
 def upload_video(
     submission: praw.models.Submission,
     video_file: str,
     part: int | None = None,
     total_parts: int | None = None,
-) -> None:
+    youtube=None,
+) -> str | None:
     """
     Uploads a video to YouTube using info from a PRAW submission object and a YAML config for static/auth settings.
     """
@@ -268,17 +349,19 @@ def upload_video(
         "scopes", ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
     )
 
-    creds = get_credentials(scopes)
-
-    youtube = build("youtube", "v3", credentials=creds)
+    if youtube is None:
+        creds = get_credentials(scopes)
+        youtube = build("youtube", "v3", credentials=creds)
 
     tags = _build_tags(submission, tags_config)
     description = _build_description(
         submission,
-        part=part,
-        total_parts=total_parts,
-        tags=tags,
-        add_shorts_hashtag=bool(not tags and shorts_config.get("enabled") and shorts_config.get("add_hashtag", True)),
+        **_description_kwargs(
+            part=part,
+            total_parts=total_parts,
+            tags=tags,
+            shorts_config=shorts_config,
+        ),
     )
 
     safe_title = submission.title if submission.title else "Reddit Story"
@@ -327,6 +410,7 @@ def upload_video(
             part=part,
             total_parts=total_parts,
         )
+        return response["id"]
 
     except RefreshError as exc:
         record_video_upload_error(
@@ -347,3 +431,49 @@ def upload_video(
             total_parts=total_parts,
         )
         raise
+
+    return None
+
+
+def upload_submission_videos(
+    submission: praw.models.Submission,
+    videos: list[tuple[str, int, int]],
+) -> None:
+    """Upload all parts for a submission and link each part to the next in order."""
+    if not videos:
+        return
+
+    load_dotenv(override=True)
+    config = load_config()
+    scopes = config.get(
+        "scopes", ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
+    )
+    youtube = build("youtube", "v3", credentials=get_credentials(scopes))
+    uploaded_ids: dict[int, str] = {}
+
+    for video_file, part, total_parts in videos:
+        video_id = upload_video(
+            submission,
+            video_file,
+            part=part,
+            total_parts=total_parts,
+            youtube=youtube,
+        )
+        if not video_id:
+            continue
+
+        if part > 1:
+            previous_part = part - 1
+            previous_video_id = uploaded_ids.get(previous_part)
+            if previous_video_id and total_parts > 1:
+                link_next_part_in_description(
+                    submission,
+                    video_id=previous_video_id,
+                    part=previous_part,
+                    total_parts=total_parts,
+                    next_video_id=video_id,
+                    next_part=part,
+                    youtube=youtube,
+                )
+
+        uploaded_ids[part] = video_id
