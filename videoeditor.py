@@ -5,7 +5,7 @@ import stable_whisper
 from moviepy import AudioFileClip, CompositeVideoClip, ImageClip, VideoFileClip, concatenate_audioclips, vfx
 from moviepy.video.fx.Loop import Loop
 
-from config import load_config, load_sfx_config
+from config import DEBUG, load_config, load_sfx_config
 from highlighted_subtitles import create_highlighted_subtitles_clip
 from logger import logger
 from parts import split_segments
@@ -230,7 +230,11 @@ def _render_part(
         layers.append(card_clip)
     layers.append(subtitles_clip.with_position(pos))
     final_video = CompositeVideoClip(layers)
-    final_video.write_videofile(output_path, fps=fps)
+    final_video.write_videofile(
+        output_path,
+        fps=fps,
+        logger="bar" if DEBUG else None,
+    )
 
 
 def create_videos(submission) -> list[tuple[str, int, int]]:
