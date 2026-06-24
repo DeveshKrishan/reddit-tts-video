@@ -10,7 +10,7 @@ from observability import create_metrics_tracker, shutdown_otel
 from text_utils import clean_post_text
 from tts import generate_tts
 from videoeditor import create_videos
-from youtube import upload_video
+from youtube import upload_submission_videos
 
 OUTPUT_FOLDER = "assets/audio"
 
@@ -61,19 +61,12 @@ def main() -> None:
         with metrics.track_phase("video_render", submission_id=submission_id):
             videos = create_videos(submission)
 
-        for video_file, part, total_parts in videos:
-            with metrics.track_phase(
-                "youtube_upload",
-                submission_id=submission_id,
-                part=part,
-                total_parts=total_parts,
-            ):
-                upload_video(
-                    submission=submission,
-                    video_file=video_file,
-                    part=part,
-                    total_parts=total_parts,
-                )
+        with metrics.track_phase(
+            "youtube_upload",
+            submission_id=submission_id,
+            total_parts=len(videos),
+        ):
+            upload_submission_videos(submission, videos)
 
     job_end = datetime.now(timezone.utc)
     job_end_str = job_end.strftime("%Y-%m-%dT%H:%M:%SZ")
